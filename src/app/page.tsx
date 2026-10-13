@@ -1,10 +1,14 @@
 import Link from "next/link";
-import { Suspense } from "react";
 
 import { ContactSearch } from "@/components/contact-search";
 import { ContactsTable } from "@/components/contacts-table";
 import { buttonVariants } from "@/components/ui/button";
 import { listContacts } from "@/lib/contacts";
+
+// Render the list in the first HTML instead of streaming it behind a
+// "loading" placeholder: the query takes milliseconds, while swapping
+// 1000 streamed rows into the page cost a noticeable delay
+export const instant = false;
 
 export default function HomePage({ searchParams }: PageProps<"/">) {
   return (
@@ -15,9 +19,7 @@ export default function HomePage({ searchParams }: PageProps<"/">) {
           Добавить контакт
         </Link>
       </div>
-      <Suspense fallback={<p className="text-muted-foreground">Загружаю контакты…</p>}>
-        <ContactsSection searchParams={searchParams} />
-      </Suspense>
+      <ContactsSection searchParams={searchParams} />
     </div>
   );
 }

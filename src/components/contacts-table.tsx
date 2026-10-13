@@ -1,47 +1,36 @@
-import Link from "next/link";
+"use client";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { SoftNavigation } from "@/components/soft-navigation";
 import type { ContactListItem } from "@/lib/contacts";
 
+// A client component on purpose: the server sends the rows as compact data
+// instead of a serialized element tree for every cell, which keeps a
+// 1000-row page small. Styling lives once in globals.css (.contacts-table).
 export function ContactsTable({ contacts }: { contacts: ContactListItem[] }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Имя</TableHead>
-          <TableHead className="hidden md:table-cell">Кто это</TableHead>
-          <TableHead>Телефон</TableHead>
-          <TableHead className="hidden lg:table-cell">Почта</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {contacts.map((contact) => (
-          <TableRow key={contact.id}>
-            <TableCell className="font-medium">
-              <Link
-                href={`/contacts/${contact.id}`}
-                className="underline-offset-4 hover:underline"
-              >
-                {contact.name}
-              </Link>
-            </TableCell>
-            <TableCell className="hidden max-w-xs truncate text-muted-foreground md:table-cell">
-              {contact.about}
-            </TableCell>
-            <TableCell>{contact.phone}</TableCell>
-            <TableCell className="hidden text-muted-foreground lg:table-cell">
-              {contact.email}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <SoftNavigation>
+      <table className="contacts-table">
+        <thead>
+          <tr>
+            <th>Имя</th>
+            <th>Кто это</th>
+            <th>Телефон</th>
+            <th>Почта</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contacts.map((contact) => (
+            <tr key={contact.id}>
+              <td>
+                <a href={`/contacts/${contact.id}`}>{contact.name}</a>
+              </td>
+              <td>{contact.about}</td>
+              <td>{contact.phone}</td>
+              <td>{contact.email}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </SoftNavigation>
   );
 }
