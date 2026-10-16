@@ -5,7 +5,9 @@ export default function NewContactPage() {
   return (
     <div className="grid max-w-2xl gap-6">
       <BackToList />
-      <h1 className="text-2xl font-semibold">Новый контакт</h1>
+      <h1 className="font-heading text-title font-medium lg:text-title-lg">
+        Новый контакт
+      </h1>
       <ContactForm />
     </div>
   );

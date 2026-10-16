@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import Link from "next/link";
 
 import { ContactSearch } from "@/components/contact-search";
@@ -12,10 +13,13 @@ export const instant = false;
 
 export default function HomePage({ searchParams }: PageProps<"/">) {
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Контакты</h1>
+    <div className="grid gap-6 lg:gap-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-heading text-title font-medium lg:text-title-lg">
+          Контакты
+        </h1>
         <Link href="/contacts/new" className={buttonVariants()}>
+          <Plus aria-hidden="true" strokeWidth={2.5} data-icon="inline-start" />
           Добавить контакт
         </Link>
       </div>
@@ -43,7 +47,7 @@ async function ContactsSection({
       {contacts.length > 0 ? (
         <ContactsTable contacts={contacts} />
       ) : (
-        <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+        <p className="rounded-2xl border-[1.5px] border-dashed border-border-dashed bg-card p-8 text-center text-muted-foreground">
           {search
             ? "Никого не нашли. Попробуйте написать имя иначе."
             : "Пока нет ни одного контакта. Нажмите «Добавить контакт»."}

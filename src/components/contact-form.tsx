@@ -6,9 +6,9 @@ import {
   createContactAction,
   updateContactAction,
 } from "@/app/contacts/actions";
+import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   ContactField,
@@ -42,7 +42,7 @@ export function ContactForm({ contact }: ContactFormProps) {
   const errorFor = (field: ContactField) => state.errors?.[field]?.[0];
 
   return (
-    <form action={formAction} className="grid gap-5" noValidate>
+    <form action={formAction} className="grid gap-2.5" noValidate>
       <Field
         name="name"
         label="Имя"
@@ -65,7 +65,7 @@ export function ContactForm({ contact }: ContactFormProps) {
         error={errorFor("howWeMet")}
         placeholder="Например: курсы английского, 2023"
       />
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-2.5 sm:grid-cols-2">
         <Field
           name="phone"
           label="Телефон"
@@ -83,21 +83,16 @@ export function ContactForm({ contact }: ContactFormProps) {
           placeholder="anna@example.com"
         />
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="notes">Заметки</Label>
-        <Textarea
-          id="notes"
-          name="notes"
-          rows={8}
-          defaultValue={values.notes}
-          aria-invalid={errorFor("notes") ? true : undefined}
-          aria-describedby={errorFor("notes") ? "notes-error" : undefined}
-          placeholder="О чём говорили, о чём договорились"
-        />
-        <FieldError id="notes-error" message={errorFor("notes")} />
-      </div>
+      <Field
+        name="notes"
+        label="Заметки"
+        multiline
+        defaultValue={values.notes}
+        error={errorFor("notes")}
+        placeholder="О чём говорили, о чём договорились"
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-3.5 flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? "Сохраняю…" : contact ? "Сохранить" : "Добавить контакт"}
         </Button>
@@ -121,9 +116,7 @@ function FormStatus({ state }: { state: ContactFormState }) {
       minute: "2-digit",
     });
     return (
-      <p aria-live="polite" className="text-sm text-muted-foreground">
-        Изменения сохранены в {time}
-      </p>
+      <StatusPill aria-live="polite">Изменения сохранены в {time}</StatusPill>
     );
   }
   return null;
@@ -136,9 +129,18 @@ type FieldProps = {
   error?: string;
   required?: boolean;
   type?: "text" | "tel" | "email";
+  // Multi-line text area instead of a single-line input
+  multiline?: boolean;
   placeholder?: string;
 };
 
+// The control sits inside the field card, so it drops its own frame
+const controlClassName =
+  "rounded-none border-0 bg-transparent p-0 placeholder:font-normal dark:bg-transparent";
+
+// Field card from the landing's first screen: small label on top, value below,
+// ink outline on the field being edited. The whole card is the label, so a
+// click anywhere on it focuses the control.
 function Field({
   name,
   label,
@@ -146,25 +148,42 @@ function Field({
   error,
   required,
   type = "text",
+  multiline,
   placeholder,
 }: FieldProps) {
   const errorId = `${name}-error`;
+  const controlProps = {
+    id: name,
+    name,
+    defaultValue,
+    placeholder,
+    "aria-invalid": error ? true : undefined,
+    "aria-describedby": error ? errorId : undefined,
+  };
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={name}>
-        {label}
-        {required && <span className="text-destructive">*</span>}
-      </Label>
-      <Input
-        id={name}
-        name={name}
-        type={type}
-        defaultValue={defaultValue}
-        required={required}
-        placeholder={placeholder}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-      />
+    <div className="grid content-start gap-1.5">
+      <label
+        htmlFor={name}
+        className="grid cursor-text gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors hover:not-focus-within:border-border-dashed focus-within:border-foreground has-aria-invalid:border-destructive"
+      >
+        <span className="text-[0.8125rem] text-subtle-foreground">
+          {label}
+          {required && <span className="ml-0.5 text-destructive">*</span>}
+        </span>
+        {multiline ? (
+          <Textarea
+            {...controlProps}
+            className={`${controlClassName} min-h-36 font-medium`}
+          />
+        ) : (
+          <Input
+            {...controlProps}
+            type={type}
+            required={required}
+            className={`${controlClassName} h-6 font-semibold`}
+          />
+        )}
+      </label>
       <FieldError id={errorId} message={error} />
     </div>
   );
@@ -173,7 +192,7 @@ function Field({
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
   return (
-    <p id={id} className="text-sm text-destructive">
+    <p id={id} className="px-1 text-sm text-destructive">
       {message}
     </p>
   );
