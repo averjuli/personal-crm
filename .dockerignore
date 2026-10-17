@@ -1,0 +1,11 @@
+# Keep secrets, local builds and installed packages out of the Docker build
+.env
+.env.*
+.git
+.github
+.next
+node_modules
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+.dockerignore

@@ -1,0 +1,68 @@
+# Every push to main: build the Docker image, ship it to the server over SSH,
+# apply migrations, restart the app and check https://app.vupsen.space/health.
+# Server side: deploy/crm-deploy.sh. Secrets: DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits for the running one instead of cancelling it
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APP_HOST: app.vupsen.space
+  DEPLOY_USER: crmapp
+  IMAGE: personal-crm-app:latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # The server key may only run `crm-deploy deploy`, which reads the image from stdin
+      - name: Deploy to the server
+        run: |
+          docker save "$IMAGE" | gzip | ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o ServerAliveInterval=30 \
+            "$DEPLOY_USER@$APP_HOST"
+
+      - name: Check the public address
+        run: |
+          body=$(curl -fsS --retry 5 --retry-delay 3 --retry-all-errors "https://$APP_HOST/health")
+          echo "$body"
+          grep -q "\"version\":\"$GITHUB_SHA\"" <<<"$body" || { echo "server runs another version"; exit 1; }
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
