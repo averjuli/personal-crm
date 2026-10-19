@@ -1,7 +1,14 @@
-# Production on the server: the app and its own PostgreSQL.
-# Installed to /opt/personal-crm by deploy/install-on-server.sh; secrets come from
-# /opt/personal-crm/.env (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB).
-name: personal-crm
+# Production on the server: the app and its own PostgreSQL, compose project "prod".
+# Every deploy copies deploy/ to /opt/personal-crm/deploy; run it only through crm-deploy,
+# which sets APP_TAG. Secrets come from /opt/personal-crm/.env (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB).
+name: prod
+
+# Container logs: at most 3 files of 10 MB each
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
 
 services:
   db:
@@ -16,14 +23,16 @@ services:
       # Postgres 18+ images keep data under /var/lib/postgresql
       - db-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      # Over TCP: while a new database initializes, Postgres listens on its socket only
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *logging
 
   app:
-    # Built in GitHub Actions and loaded by crm-deploy; never pulled from a registry
-    image: personal-crm-app:latest
+    # Built by GitHub Actions and tagged with the commit SHA; crm-deploy pulls it, compose never does
+    image: ghcr.io/averjuli/personal-crm:${APP_TAG:?run through crm-deploy, it sets APP_TAG}
     pull_policy: never
     restart: unless-stopped
     depends_on:
@@ -41,6 +50,7 @@ services:
       retries: 3
       start_period: 30s
       start_interval: 2s
+    logging: *logging
 
 volumes:
   db-data:

@@ -1,6 +1,6 @@
-# Every push to main: build the Docker image, ship it to the server over SSH,
-# apply migrations, restart the app and check https://app.vupsen.space/health.
-# Server side: deploy/crm-deploy.sh. Secrets: DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
+# Every push to main: build the image, push it to GHCR tagged with the commit SHA,
+# copy deploy/ to the server and run crm-deploy there: migrations -> new version -> smoke /health.
+# All deploy logic lives in deploy/crm-deploy.sh. Secrets: DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS.
 name: Deploy
 
 on:
@@ -17,28 +17,47 @@ permissions:
   contents: read
 
 env:
-  APP_HOST: app.vupsen.space
-  DEPLOY_USER: crmapp
-  IMAGE: personal-crm-app:latest
+  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: docker/setup-buildx-action@v4
 
-      - name: Build the image
+      - name: Build and push the image
         uses: docker/build-push-action@v7
         with:
           context: .
-          load: true
-          tags: ${{ env.IMAGE }}
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           build-args: APP_VERSION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # The server pulls the image with this job's short-lived token
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
 
       - name: Set up SSH
         env:
@@ -49,19 +68,24 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host server
+            HostName app.vupsen.space
+            User crmapp
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            BatchMode yes
+            ServerAliveInterval 30
+          EOF
 
-      # The server key may only run `crm-deploy deploy`, which reads the image from stdin
-      - name: Deploy to the server
-        run: |
-          docker save "$IMAGE" | gzip | ssh -i ~/.ssh/deploy_key \
-            -o IdentitiesOnly=yes -o BatchMode=yes -o ServerAliveInterval=30 \
-            "$DEPLOY_USER@$APP_HOST"
+      # The key may run only `sudo crm-deploy <command>` on the server
+      - name: Copy deploy scripts to the server
+        run: tar -C deploy -cz . | ssh server upload
 
-      - name: Check the public address
-        run: |
-          body=$(curl -fsS --retry 5 --retry-delay 3 --retry-all-errors "https://$APP_HOST/health")
-          echo "$body"
-          grep -q "\"version\":\"$GITHUB_SHA\"" <<<"$body" || { echo "server runs another version"; exit 1; }
+      - name: Deploy
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s\n' "$GITHUB_ACTOR" "$GHCR_TOKEN" | ssh server deploy "$GITHUB_SHA"
 
       - name: Remove the SSH key
         if: always()
