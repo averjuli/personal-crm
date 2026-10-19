@@ -4,7 +4,8 @@
 #   2. /opt/personal-crm with deploy/ and .env (secrets, root only); the crm-deploy command
 #   3. access: crmapp may run crm-deploy through sudo without a password,
 #      and the GitHub Actions key in crmapp's authorized_keys may run only crm-deploy
-#   4. nginx: app.vupsen.space proxies to the app on 127.0.0.1:3000 instead of the stub page
+#   4. nginx: app.vupsen.space proxies to the app on 127.0.0.1:3000 instead of the stub page,
+#      and shows deploy/unavailable.html while the app is not running
 #   5. one-time move from the compose project "personal-crm" to "prod", data included;
 #      the old volume personal-crm_db-data is kept untouched
 # Run from the folder with this script: sudo bash install-on-server.sh
@@ -102,19 +103,34 @@ else
   echo "WARNING: no key '$DEPLOY_KEY_COMMENT' in $keys, GitHub Actions cannot deploy yet"
 fi
 
-step "4/5 nginx: app.vupsen.space -> 127.0.0.1:3000"
-cat > "$PROXY_SNIPPET" <<'NGINX'
+step "4/5 nginx: app.vupsen.space -> 127.0.0.1:3000, own page while the app is down"
+snippet_old=""
+if [ -e "$PROXY_SNIPPET" ]; then
+  snippet_old=$(mktemp)
+  cp -p "$PROXY_SNIPPET" "$snippet_old"
+fi
+cat > "$PROXY_SNIPPET" <<NGINX
 # Managed by personal-crm deploy/install-on-server.sh
 location / {
     proxy_pass http://127.0.0.1:3000;
     proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+}
+
+# While the app is not running: a page in its style instead of nginx's "502 Bad Gateway".
+# Every deploy refreshes the file together with the rest of deploy/
+error_page 502 503 504 /_unavailable.html;
+location = /_unavailable.html {
+    internal;
+    alias $APP_DIR/deploy/unavailable.html;
 }
 NGINX
+chmod 644 "$PROXY_SNIPPET"
+backup_conf=""
 if grep -q "include snippets/personal-crm-app.conf;" "$SITE_CONF"; then
   echo "$SITE_CONF already proxies to the app"
 else
@@ -138,15 +154,23 @@ if text.count(stub) != 1:
     sys.exit("stub block for app.vupsen.space not found, nginx config left unchanged")
 open(path, "w").write(text.replace(stub, proxy))
 PY
-  if ! nginx -t; then
-    cp -p "$backup_conf" "$SITE_CONF"
-    echo "nginx config test failed, restored $SITE_CONF"
-    exit 1
-  fi
   echo "backup of the old config: $backup_conf"
 fi
-nginx -t 2>/dev/null && systemctl reload nginx
+# A broken config would also break the landing on the next reload, so put the old one back
+if ! nginx -t; then
+  if [ -n "$snippet_old" ]; then cp -p "$snippet_old" "$PROXY_SNIPPET"; else rm -f "$PROXY_SNIPPET"; fi
+  [ -z "$backup_conf" ] || cp -p "$backup_conf" "$SITE_CONF"
+  rm -f "$snippet_old"
+  die "nginx config test failed, the previous nginx config is restored"
+fi
+rm -f "$snippet_old"
+systemctl reload nginx
 echo "nginx reloaded"
+if runuser -u www-data -- test -r "$APP_DIR/deploy/unavailable.html"; then
+  echo "nginx can read $APP_DIR/deploy/unavailable.html"
+else
+  echo "WARNING: nginx cannot read $APP_DIR/deploy/unavailable.html, it will show its own 502 page"
+fi
 
 step "5/5 Compose project personal-crm -> prod"
 old_db=$(container personal-crm db)
