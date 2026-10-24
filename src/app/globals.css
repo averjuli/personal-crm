@@ -127,21 +127,25 @@
     @apply mt-0.5 text-[0.8125rem] leading-snug text-muted-foreground;
   }
   /* Phones and mobile/narrow windows show only the name column, which takes
-     the remaining width; "Телефон" from md (it always fits in full), "Почта"
-     from lg */
-  .contacts-table :is(th, td):nth-child(2) {
+     the remaining width; "Как часто" and "Телефон" from md (they always fit
+     in full), "Почта" from lg */
+  .contacts-table :is(th, td):nth-child(2),
+  .contacts-table :is(th, td):nth-child(3) {
     @apply hidden md:table-cell;
   }
   .contacts-table th:nth-child(2) {
-    @apply w-48;
-  }
-  .contacts-table :is(th, td):nth-child(3) {
-    @apply hidden lg:table-cell;
+    @apply w-40;
   }
   .contacts-table th:nth-child(3) {
+    @apply w-48;
+  }
+  .contacts-table :is(th, td):nth-child(4) {
+    @apply hidden lg:table-cell;
+  }
+  .contacts-table th:nth-child(4) {
     @apply w-[30%];
   }
-  .contacts-table td:nth-child(3) {
+  .contacts-table td:nth-child(4) {
     @apply text-muted-foreground;
   }
 }

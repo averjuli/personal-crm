@@ -9,12 +9,20 @@ import {
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   ContactField,
   ContactFormState,
   ContactFormValues,
 } from "@/lib/contact-form";
+import { frequencyLabels } from "@/lib/keep-in-touch";
 
 const initialState: ContactFormState = { status: "idle" };
 
@@ -24,12 +32,26 @@ const emptyValues: ContactFormValues = {
   howWeMet: "",
   phone: "",
   email: "",
-  notes: "",
+  frequency: "",
+  note: "",
 };
+
+const frequencyItems = [
+  { value: "", label: "Не задано" },
+  ...Object.entries(frequencyLabels).map(([value, label]) => ({
+    value,
+    label,
+  })),
+];
 
 type ContactFormProps = {
   // Existing contact to edit; omit to create a new one
-  contact?: { id: number; values: ContactFormValues };
+  contact?: {
+    id: number;
+    values: ContactFormValues;
+    // Ready-made lines under the frequency field: last communication, due day
+    keepInTouchLines: string[];
+  };
 };
 
 export function ContactForm({ contact }: ContactFormProps) {
@@ -83,14 +105,22 @@ export function ContactForm({ contact }: ContactFormProps) {
           placeholder="anna@example.com"
         />
       </div>
-      <Field
-        name="notes"
-        label="Заметки"
-        multiline
-        defaultValue={values.notes}
-        error={errorFor("notes")}
-        placeholder="О чём говорили, о чём договорились"
+      <FrequencyField
+        defaultValue={values.frequency}
+        error={errorFor("frequency")}
+        lines={contact?.keepInTouchLines}
       />
+      {/* Notes of an existing contact live in their own block on the card */}
+      {!contact && (
+        <Field
+          name="note"
+          label="Заметка"
+          multiline
+          defaultValue={values.note}
+          error={errorFor("note")}
+          placeholder="О чём говорили, о чём договорились"
+        />
+      )}
 
       <div className="mt-3.5 flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
@@ -185,6 +215,55 @@ function Field({
         )}
       </label>
       <FieldError id={errorId} message={error} />
+    </div>
+  );
+}
+
+function FrequencyField({
+  defaultValue,
+  error,
+  lines,
+}: {
+  defaultValue: string;
+  error?: string;
+  lines?: string[];
+}) {
+  return (
+    <div className="grid content-start gap-1.5">
+      <label
+        htmlFor="frequency"
+        className="grid cursor-pointer gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors hover:not-focus-within:border-border-dashed focus-within:border-foreground has-aria-invalid:border-destructive"
+      >
+        <span className="text-[0.8125rem] text-subtle-foreground">
+          Как часто общаться
+        </span>
+        <Select
+          name="frequency"
+          defaultValue={defaultValue}
+          items={frequencyItems}
+        >
+          <SelectTrigger
+            id="frequency"
+            aria-invalid={error ? true : undefined}
+            className="h-6 w-full rounded-none border-0 bg-transparent p-0 font-semibold focus-visible:ring-0 dark:bg-transparent dark:hover:bg-transparent"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false} align="start">
+            {frequencyItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      {lines?.map((line) => (
+        <p key={line} className="px-1 text-sm text-muted-foreground">
+          {line}
+        </p>
+      ))}
+      <FieldError id="frequency-error" message={error} />
     </div>
   );
 }

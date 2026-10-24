@@ -3,6 +3,7 @@
 import { SoftNavigation } from "@/components/soft-navigation";
 import type { ContactListItem } from "@/lib/contacts";
 import { initials } from "@/lib/initials";
+import { frequencyLabels } from "@/lib/keep-in-touch";
 
 // A client component on purpose: the server sends the rows as compact data
 // instead of a serialized element tree for every cell, which keeps a
@@ -15,6 +16,7 @@ export function ContactsTable({ contacts }: { contacts: ContactListItem[] }) {
           <thead>
             <tr>
               <th>Имя</th>
+              <th>Как часто</th>
               <th>Телефон</th>
               <th>Почта</th>
             </tr>
@@ -30,6 +32,9 @@ export function ContactsTable({ contacts }: { contacts: ContactListItem[] }) {
                       {contact.about && <p>{contact.about}</p>}
                     </div>
                   </div>
+                </td>
+                <td>
+                  {contact.frequency && frequencyLabels[contact.frequency]}
                 </td>
                 <td>{contact.phone}</td>
                 <td>{contact.email}</td>
