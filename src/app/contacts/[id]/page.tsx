@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { BackToList } from "@/components/back-to-list";
 import { ContactForm } from "@/components/contact-form";
+import { DeleteContactButton } from "@/components/delete-contact-button";
 import { StatusPill } from "@/components/status-pill";
 import { getContact } from "@/lib/contacts";
 import { initials } from "@/lib/initials";
@@ -68,6 +69,12 @@ async function ContactDetails({
           },
         }}
       />
+      {/* Kept apart from "Сохранить", so it is not pressed by mistake */}
+      <div className="border-t pt-6">
+        <DeleteContactButton
+          contact={{ id: contact.id, name: contact.name }}
+        />
+      </div>
     </>
   );
 }

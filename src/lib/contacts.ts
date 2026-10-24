@@ -54,3 +54,12 @@ export async function updateContact(id: number, input: ContactInput) {
     .returning({ id: contacts.id });
   return updated.length > 0;
 }
+
+// Returns false when the contact does not exist
+export async function deleteContact(id: number) {
+  const deleted = await db
+    .delete(contacts)
+    .where(eq(contacts.id, id))
+    .returning({ id: contacts.id });
+  return deleted.length > 0;
+}

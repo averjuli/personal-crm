@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 
 import { parseContactForm, type ContactFormState } from "@/lib/contact-form";
-import { createContact, updateContact } from "@/lib/contacts";
+import { createContact, deleteContact, updateContact } from "@/lib/contacts";
 
 export async function createContactAction(
   _prevState: ContactFormState,
@@ -45,4 +45,17 @@ export async function updateContactAction(
 
   revalidatePath("/", "layout");
   return { status: "saved", savedAt: new Date().toISOString() };
+}
+
+export async function deleteContactAction(id: number) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new Error(`Invalid contact id: ${id}`);
+  }
+
+  // A contact already deleted elsewhere ends the same way: it is gone
+  await deleteContact(id);
+
+  revalidatePath("/", "layout");
+  // Replace the card in history, so "Back" does not lead to a deleted contact
+  redirect("/?deleted=1", RedirectType.replace);
 }
