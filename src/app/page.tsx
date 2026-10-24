@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { ContactSearch } from "@/components/contact-search";
 import { ContactsTable } from "@/components/contacts-table";
+import { StatusPill } from "@/components/status-pill";
 import { buttonVariants } from "@/components/ui/button";
 import { listContacts } from "@/lib/contacts";
 
@@ -31,12 +32,15 @@ export default function HomePage({ searchParams }: PageProps<"/">) {
 async function ContactsSection({
   searchParams,
 }: Pick<PageProps<"/">, "searchParams">) {
-  const { q } = await searchParams;
+  const { q, deleted } = await searchParams;
   const search = (typeof q === "string" ? q : "").trim();
   const contacts = await listContacts(search);
 
   return (
     <div className="grid gap-4">
+      {deleted === "1" && (
+        <StatusPill role="status">Контакт удалён.</StatusPill>
+      )}
       {/* key resets the input when the query changes, e.g. after "Сбросить" */}
       <ContactSearch key={search} defaultValue={search} />
       <p className="text-sm text-muted-foreground">
