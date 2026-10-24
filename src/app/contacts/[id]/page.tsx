@@ -3,10 +3,16 @@ import { Suspense } from "react";
 
 import { BackToList } from "@/components/back-to-list";
 import { ContactForm } from "@/components/contact-form";
+import { ContactNotes } from "@/components/contact-notes";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { StatusPill } from "@/components/status-pill";
-import { getContact } from "@/lib/contacts";
+import { getContact, listNotes } from "@/lib/contacts";
 import { initials } from "@/lib/initials";
+import {
+  formatDay,
+  formatOverdue,
+  todayInAppTimeZone,
+} from "@/lib/keep-in-touch";
 
 export default function ContactPage(props: PageProps<"/contacts/[id]">) {
   return (
@@ -35,6 +41,23 @@ async function ContactDetails({
   }
 
   const { created } = await searchParams;
+  const notes = await listNotes(contactId);
+
+  const keepInTouchLines = [
+    contact.lastContactOn
+      ? `Последнее общение: ${formatDay(contact.lastContactOn)}`
+      : "Заметок ещё не было",
+  ];
+  if (contact.dueOn && contact.overdueDays !== null) {
+    // Past the due day the line says how late it is instead of the day
+    keepInTouchLines.push(
+      contact.overdueDays > 0
+        ? `Пора связаться: ${formatOverdue(contact.overdueDays)}`
+        : contact.overdueDays === 0
+          ? "Пора связаться: сегодня"
+          : `Пора связаться: ${formatDay(contact.dueOn)}`,
+    );
+  }
 
   return (
     <>
@@ -65,9 +88,16 @@ async function ContactDetails({
             howWeMet: contact.howWeMet ?? "",
             phone: contact.phone ?? "",
             email: contact.email ?? "",
-            notes: contact.notes ?? "",
+            frequency: contact.frequency ?? "",
+            note: "",
           },
+          keepInTouchLines,
         }}
+      />
+      <ContactNotes
+        contactId={contact.id}
+        notes={notes}
+        today={todayInAppTimeZone()}
       />
       {/* Kept apart from "Сохранить", so it is not pressed by mistake */}
       <div className="border-t pt-6">

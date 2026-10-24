@@ -4,7 +4,12 @@ import { count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import { contacts, type NewContact } from "./schema";
+import {
+  contactFrequencies,
+  contacts,
+  notes,
+  type NewContact,
+} from "./schema";
 
 const CONTACT_COUNT = 1000;
 
@@ -121,23 +126,29 @@ function makePhone() {
   return `+7 (9${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7)}`;
 }
 
+// A calendar day as YYYY-MM-DD
+function toDay(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function makeNotes() {
   return faker.helpers
     .arrayElements(NOTES, { min: 1, max: 3 })
-    .map((text) => ({ date: faker.date.past({ years: 2 }), text }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .map(({ date, text }) => `${date.toLocaleDateString("ru-RU")}: ${text}`)
-    .join("\n");
+    .map((body) => ({ body, notedOn: toDay(faker.date.past({ years: 2 })) }));
 }
 
-function makeContact(): NewContact {
+function makeContact(): { contact: NewContact; notes: { body: string; notedOn: string }[] } {
   const sex = faker.person.sexType();
   const firstName = faker.person.firstName(sex);
   const lastName = faker.person.lastName(sex);
   const [aboutMale, aboutFemale] = faker.helpers.arrayElement(ABOUT);
   const createdAt = faker.date.past({ years: 3 });
 
-  return {
+  // About 5% of contacts get a frequency, set some time ago, so that the
+  // "Time to reach out" block is not empty locally
+  const hasFrequency = faker.datatype.boolean({ probability: 0.05 });
+
+  const contact: NewContact = {
     name: `${firstName} ${lastName}`,
     about: faker.helpers.maybe(() => (sex === "male" ? aboutMale : aboutFemale), {
       probability: 0.9,
@@ -149,10 +160,17 @@ function makeContact(): NewContact {
     email:
       faker.helpers.maybe(() => makeEmail(firstName, lastName), { probability: 0.7 }) ??
       null,
-    notes: faker.helpers.maybe(makeNotes, { probability: 0.55 }) ?? null,
+    contactFrequency: hasFrequency
+      ? faker.helpers.arrayElement(contactFrequencies)
+      : null,
+    frequencySetOn: hasFrequency
+      ? toDay(faker.date.recent({ days: 90 }))
+      : null,
     createdAt,
     updatedAt: createdAt,
   };
+  const contactNotes = faker.helpers.maybe(makeNotes, { probability: 0.55 }) ?? [];
+  return { contact, notes: contactNotes };
 }
 
 async function main() {
@@ -170,9 +188,21 @@ async function main() {
     }
 
     faker.seed(20261009);
-    const rows = Array.from({ length: CONTACT_COUNT }, makeContact);
-    await db.insert(contacts).values(rows);
-    console.log(`Seed done: inserted ${rows.length} contacts.`);
+    const generated = Array.from({ length: CONTACT_COUNT }, makeContact);
+    await db.transaction(async (tx) => {
+      const inserted = await tx
+        .insert(contacts)
+        .values(generated.map((item) => item.contact))
+        .returning({ id: contacts.id });
+      // Identity ids are returned in the order of the inserted rows
+      const noteRows = generated.flatMap((item, index) =>
+        item.notes.map((note) => ({ ...note, contactId: inserted[index].id })),
+      );
+      await tx.insert(notes).values(noteRows);
+      console.log(
+        `Seed done: inserted ${inserted.length} contacts and ${noteRows.length} notes.`,
+      );
+    });
   } finally {
     await client.end();
   }

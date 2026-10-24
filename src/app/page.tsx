@@ -3,9 +3,10 @@ import Link from "next/link";
 
 import { ContactSearch } from "@/components/contact-search";
 import { ContactsTable } from "@/components/contacts-table";
+import { OverdueContacts } from "@/components/overdue-contacts";
 import { StatusPill } from "@/components/status-pill";
 import { buttonVariants } from "@/components/ui/button";
-import { listContacts } from "@/lib/contacts";
+import { listContacts, listOverdueContacts } from "@/lib/contacts";
 
 // Render the list in the first HTML instead of streaming it behind a
 // "loading" placeholder: the query takes milliseconds, while swapping
@@ -34,13 +35,18 @@ async function ContactsSection({
 }: Pick<PageProps<"/">, "searchParams">) {
   const { q, deleted } = await searchParams;
   const search = (typeof q === "string" ? q : "").trim();
-  const contacts = await listContacts(search);
+  // The "time to reach out" block is hidden while searching
+  const [contacts, overdue] = await Promise.all([
+    listContacts(search),
+    search ? null : listOverdueContacts(),
+  ]);
 
   return (
     <div className="grid gap-4">
       {deleted === "1" && (
         <StatusPill role="status">Контакт удалён.</StatusPill>
       )}
+      {overdue && <OverdueContacts contacts={overdue} />}
       {/* key resets the input when the query changes, e.g. after "Сбросить" */}
       <ContactSearch key={search} defaultValue={search} />
       <p className="text-sm text-muted-foreground">

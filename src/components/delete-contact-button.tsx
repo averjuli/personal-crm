@@ -61,7 +61,7 @@ function switchButton(event: KeyboardEvent<HTMLDivElement>) {
 }
 
 // Inside the form, so both buttons know the delete is in progress
-function DeleteFooter() {
+export function DeleteFooter() {
   const { pending } = useFormStatus();
   return (
     <AlertDialogFooter onKeyDown={switchButton}>

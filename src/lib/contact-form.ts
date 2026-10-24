@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { contactFrequencies } from "@/db/schema";
+
 // Empty or whitespace-only inputs are stored as NULL
 const optionalText = (max: number) =>
   z
@@ -26,7 +28,12 @@ export const contactInputSchema = z.object({
       "Похоже, в адресе почты опечатка",
     )
     .transform((value) => value || null),
-  notes: optionalText(20_000),
+  // "" is "not set"
+  frequency: z
+    .enum(["", ...contactFrequencies], "Выберите один из вариантов")
+    .transform((value) => value || null),
+  // First note of a new contact; the edit form has no such field
+  note: optionalText(20_000),
 });
 
 export type ContactInput = z.output<typeof contactInputSchema>;
@@ -49,7 +56,8 @@ export const contactFields: ContactField[] = [
   "howWeMet",
   "phone",
   "email",
-  "notes",
+  "frequency",
+  "note",
 ];
 
 export function readContactForm(formData: FormData): ContactFormValues {
