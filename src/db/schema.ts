@@ -5,8 +5,10 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const contactFrequencies = ["week", "month", "quarter", "year"] as const;
@@ -83,6 +85,44 @@ export const notes = pgTable(
   ],
 );
 
+export const groups = pgTable(
+  "groups",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    // Stored as typed; uniqueness ignores case (see the index below)
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // "Теннис" and "теннис" are the same group, even for concurrent requests
+    uniqueIndex("groups_name_lower_idx").on(sql`lower(${table.name})`),
+    check(
+      "groups_name_check",
+      sql`char_length(btrim(${table.name})) between 1 and 50`,
+    ),
+  ],
+);
+
+export const contactGroups = pgTable(
+  "contact_groups",
+  {
+    contactId: integer("contact_id")
+      .notNull()
+      .references(() => contacts.id, { onDelete: "cascade" }),
+    groupId: integer("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.contactId, table.groupId] }),
+    // The primary key covers lookups by contact; this one serves the group filter
+    index("contact_groups_group_id_idx").on(table.groupId),
+  ],
+);
+
 export type Contact = typeof contacts.$inferSelect;
 export type NewContact = typeof contacts.$inferInsert;
 export type Note = typeof notes.$inferSelect;
+export type Group = typeof groups.$inferSelect;

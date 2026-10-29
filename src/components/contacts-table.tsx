@@ -16,6 +16,7 @@ export function ContactsTable({ contacts }: { contacts: ContactListItem[] }) {
           <thead>
             <tr>
               <th>Имя</th>
+              <th>Группы</th>
               <th>Как часто</th>
               <th>Телефон</th>
               <th>Почта</th>
@@ -33,6 +34,7 @@ export function ContactsTable({ contacts }: { contacts: ContactListItem[] }) {
                     </div>
                   </div>
                 </td>
+                <td>{contact.groupNames.join(", ")}</td>
                 <td>
                   {contact.frequency && frequencyLabels[contact.frequency]}
                 </td>

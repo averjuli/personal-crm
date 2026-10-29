@@ -6,7 +6,7 @@ import { ContactForm } from "@/components/contact-form";
 import { ContactNotes } from "@/components/contact-notes";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { StatusPill } from "@/components/status-pill";
-import { getContact, listNotes } from "@/lib/contacts";
+import { getContact, listGroups, listNotes } from "@/lib/contacts";
 import { initials } from "@/lib/initials";
 import {
   formatDay,
@@ -41,7 +41,10 @@ async function ContactDetails({
   }
 
   const { created } = await searchParams;
-  const notes = await listNotes(contactId);
+  const [notes, groups] = await Promise.all([
+    listNotes(contactId),
+    listGroups(),
+  ]);
 
   const keepInTouchLines = [
     contact.lastContactOn
@@ -80,6 +83,7 @@ async function ContactDetails({
         )}
       </div>
       <ContactForm
+        groups={groups}
         contact={{
           id: contact.id,
           values: {
@@ -90,6 +94,7 @@ async function ContactDetails({
             email: contact.email ?? "",
             frequency: contact.frequency ?? "",
             note: "",
+            groupIds: contact.groupIds.map(String),
           },
           keepInTouchLines,
         }}

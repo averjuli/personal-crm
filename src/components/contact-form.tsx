@@ -1,11 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import {
   createContactAction,
   updateContactAction,
 } from "@/app/contacts/actions";
+import { addGroupAction } from "@/app/groups/actions";
 import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +41,7 @@ const emptyValues: ContactFormValues = {
   email: "",
   frequency: "",
   note: "",
+  groupIds: [],
 };
 
 const frequencyItems = [
@@ -44,7 +52,11 @@ const frequencyItems = [
   })),
 ];
 
+type GroupOption = { id: number; name: string };
+
 type ContactFormProps = {
+  // Every existing group, alphabetically
+  groups: GroupOption[];
   // Existing contact to edit; omit to create a new one
   contact?: {
     id: number;
@@ -54,7 +66,7 @@ type ContactFormProps = {
   };
 };
 
-export function ContactForm({ contact }: ContactFormProps) {
+export function ContactForm({ groups, contact }: ContactFormProps) {
   const action = contact
     ? updateContactAction.bind(null, contact.id)
     : createContactAction;
@@ -109,6 +121,12 @@ export function ContactForm({ contact }: ContactFormProps) {
         defaultValue={values.frequency}
         error={errorFor("frequency")}
         lines={contact?.keepInTouchLines}
+      />
+      <GroupsField
+        groups={groups}
+        defaultIds={values.groupIds.map(Number)}
+        // A new state object after every submit
+        submitState={state}
       />
       {/* Notes of an existing contact live in their own block on the card */}
       {!contact && (
@@ -264,6 +282,138 @@ function FrequencyField({
         </p>
       ))}
       <FieldError id="frequency-error" message={error} />
+    </div>
+  );
+}
+
+// Checkboxes for the existing groups and a small form to add a new one. The
+// new group is created at once and checked; "Сохранить" then sends only ids of
+// existing groups. The input has no name, so it is not part of the contact
+function GroupsField({
+  groups,
+  defaultIds,
+  submitState,
+}: {
+  groups: GroupOption[];
+  defaultIds: number[];
+  submitState: ContactFormState;
+}) {
+  const [checked, setChecked] = useState(() => new Set(defaultIds));
+  // Groups added here that the page props do not carry yet
+  const [added, setAdded] = useState<GroupOption[]>([]);
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState<string>();
+  const [adding, startAdding] = useTransition();
+  const boxesRef = useRef<HTMLDivElement>(null);
+
+  // React resets the form after every submit, which unchecks the boxes on the
+  // screen while the state still holds the choice. Put the screen back in line
+  // with the state
+  useEffect(() => {
+    boxesRef.current
+      ?.querySelectorAll<HTMLInputElement>("input[name=groupIds]")
+      .forEach((box) => {
+        box.checked = checked.has(Number(box.value));
+      });
+  }, [submitState, checked]);
+
+  const all = [
+    ...groups,
+    ...added.filter((group) => !groups.some((known) => known.id === group.id)),
+  ].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+
+  function toggle(id: number) {
+    setChecked((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function addGroup() {
+    startAdding(async () => {
+      const result = await addGroupAction(newName);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setError(undefined);
+      setNewName("");
+      setAdded((current) => [...current, result.group]);
+      setChecked((current) => new Set(current).add(result.group.id));
+    });
+  }
+
+  return (
+    <div
+      ref={boxesRef}
+      role="group"
+      aria-labelledby="groups-label"
+      className="grid content-start gap-3 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5"
+    >
+      <span id="groups-label" className="text-[0.8125rem] text-subtle-foreground">
+        Группы
+      </span>
+      {all.length > 0 ? (
+        <ul className="flex flex-wrap gap-2">
+          {all.map((group) => (
+            <li key={group.id}>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-[1.5px] border-border px-3 py-1.5 text-sm font-semibold transition-colors hover:border-border-dashed has-checked:border-foreground has-checked:bg-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-solid has-focus-visible:outline-ring">
+                <input
+                  type="checkbox"
+                  name="groupIds"
+                  value={group.id}
+                  checked={checked.has(group.id)}
+                  onChange={() => toggle(group.id)}
+                  className="size-4 accent-foreground"
+                />
+                <span className="break-words">{group.name}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">Групп пока нет</p>
+      )}
+      <div className="grid gap-1.5">
+        <label
+          htmlFor="new-group"
+          className="text-[0.8125rem] text-subtle-foreground"
+        >
+          Новая группа
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id="new-group"
+            value={newName}
+            onChange={(event) => setNewName(event.target.value)}
+            // Enter adds the group instead of submitting the whole contact
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (!adding) {
+                  addGroup();
+                }
+              }
+            }}
+            placeholder="Например: Теннис"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "new-group-error" : undefined}
+            className="max-w-xs"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={adding}
+            onClick={addGroup}
+          >
+            {adding ? "Добавляю…" : "Добавить"}
+          </Button>
+        </div>
+        <FieldError id="new-group-error" message={error} />
+      </div>
     </div>
   );
 }
