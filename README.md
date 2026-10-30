@@ -59,7 +59,7 @@
 | `pnpm lint` | Проверяет код на ошибки |
 | `pnpm format` | Приводит оформление кода к единому виду (Prettier). `pnpm format:check` — только проверяет, ничего не меняя |
 | `pnpm typecheck` | Проверяет типы TypeScript |
-| `pnpm test` | Запускает быстрые тесты (Vitest) |
+| `pnpm test` | Запускает быстрые тесты (Vitest). Нужен запущенный Docker Desktop: тесты логики работают со своей базой `personal_crm_test` и ваши контакты не трогают |
 | `pnpm test:e2e` | Запускает e2e-тесты (Playwright): собирает приложение, запускает его на порту 3100 и проходит сценарии в браузере Microsoft Edge. Нужен запущенный Docker Desktop. Тесты работают со своей базой `personal_crm_e2e` и ваши контакты не трогают. Отчёт об упавшем тесте — `pnpm exec playwright show-report` |
 
 ## Проверки на GitHub (CI)
