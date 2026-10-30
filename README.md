@@ -57,14 +57,24 @@
 | `pnpm db:migrate` | Применяет миграции к базе |
 | `pnpm db:seed` | Заполняет пустую базу тестовыми контактами |
 | `pnpm lint` | Проверяет код на ошибки |
+| `pnpm format` | Приводит оформление кода к единому виду (Prettier). `pnpm format:check` — только проверяет, ничего не меняя |
+| `pnpm typecheck` | Проверяет типы TypeScript |
 | `pnpm test` | Запускает быстрые тесты (Vitest) |
 | `pnpm test:e2e` | Запускает e2e-тесты (Playwright): собирает приложение, запускает его на порту 3100 и проходит сценарии в браузере Microsoft Edge. Нужен запущенный Docker Desktop. Тесты работают со своей базой `personal_crm_e2e` и ваши контакты не трогают. Отчёт об упавшем тесте — `pnpm exec playwright show-report` |
+
+## Проверки на GitHub (CI)
+
+Каждый PR GitHub проверяет сам: ошибки в коде (`pnpm lint`), оформление (`pnpm format:check`), типы (`pnpm typecheck`), быстрые тесты (Vitest), e2e-тесты (Playwright) на настоящей базе и сборку образа приложения. Результат — внизу страницы PR. Настройки — в `.github/workflows/ci.yml`.
+
+Ветка `main` защищена: изменения попадают в неё только через PR и только когда все проверки зелёные. Напрямую `git push` в `main` не пройдёт. PR вливается сам после зелёных проверок, если включено автовлитие: `gh pr merge --auto --squash`.
+
+Если проверка красная: откройте её на странице PR, там видно, что упало. Чтобы проверить заранее у себя: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`. Оформление чинится командой `pnpm format`.
 
 ## Выкатка на сервер
 
 Приложение работает на https://app.vupsen.space. Выкатка автоматическая:
 
-1. Отправьте изменения в ветку `main`: `git push`.
+1. Влейте PR в ветку `main`.
 2. GitHub соберёт образ приложения и положит его в GitHub Container Registry (`ghcr.io/averjuli/personal-crm`) с тегом — кодом коммита.
 3. Затем GitHub скопирует на сервер папку `deploy` и запустит там `crm-deploy`. Он по очереди:
    - скачивает новый образ;
@@ -119,7 +129,8 @@ ssh crm sudo crm-deploy rollback
 - `e2e` — e2e-тесты: главный сценарий из `specs/01-продуктовая-идея.md` и подготовка тестовой базы. Настройки — в `playwright.config.ts`
 - `compose.yaml` — настройки PostgreSQL в Docker на этом компьютере (порт 5433)
 - `Dockerfile` — как собирается приложение для сервера
-- `.github/workflows/deploy.yml` — автоматическая выкатка после `git push` в `main`
+- `.github/workflows/ci.yml` — проверки каждого PR
+- `.github/workflows/deploy.yml` — автоматическая выкатка после влития PR в `main`
 - `deploy` — всё для сервера: приложение и база в Docker (`compose.yaml`), команда выкатки и отката (`crm-deploy.sh`), первая настройка сервера (`install-on-server.sh`), страница «Приложение временно недоступно» (`unavailable.html`)
 - `src/app/health` — адрес `/health` для проверки, что приложение и база работают
 - `openspec` — требования к фичам: действующие требования в `specs`, фичи в работе в `changes`, готовые в `changes/archive`. Настройки, в том числе язык (русский), — в `config.yaml`
