@@ -19,13 +19,18 @@ async function main() {
     process.loadEnvFile();
   }
   // Silence "schema already exists, skipping" notices
-  const client = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+  const client = postgres(process.env.DATABASE_URL!, {
+    max: 1,
+    onnotice: () => {},
+  });
 
   try {
     const before = await appliedCount(client);
     await migrate(drizzle(client), { migrationsFolder: "drizzle" });
     const after = await appliedCount(client);
-    console.log(`Migrations: ${after - before} applied now, ${after} in total.`);
+    console.log(
+      `Migrations: ${after - before} applied now, ${after} in total.`,
+    );
   } finally {
     await client.end();
   }

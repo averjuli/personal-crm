@@ -4,12 +4,7 @@ import { count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
-import {
-  contactFrequencies,
-  contacts,
-  notes,
-  type NewContact,
-} from "./schema";
+import { contactFrequencies, contacts, notes, type NewContact } from "./schema";
 
 const CONTACT_COUNT = 1000;
 
@@ -93,13 +88,48 @@ const NOTES = [
   "Обсудили идею совместного подкаста.",
 ];
 
-const EMAIL_DOMAINS = ["gmail.com", "yandex.ru", "mail.ru", "outlook.com", "icloud.com"];
+const EMAIL_DOMAINS = [
+  "gmail.com",
+  "yandex.ru",
+  "mail.ru",
+  "outlook.com",
+  "icloud.com",
+];
 
 const TRANSLIT: Record<string, string> = {
-  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z",
-  и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r",
-  с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh",
-  щ: "shch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+  а: "a",
+  б: "b",
+  в: "v",
+  г: "g",
+  д: "d",
+  е: "e",
+  ё: "e",
+  ж: "zh",
+  з: "z",
+  и: "i",
+  й: "y",
+  к: "k",
+  л: "l",
+  м: "m",
+  н: "n",
+  о: "o",
+  п: "p",
+  р: "r",
+  с: "s",
+  т: "t",
+  у: "u",
+  ф: "f",
+  х: "kh",
+  ц: "ts",
+  ч: "ch",
+  ш: "sh",
+  щ: "shch",
+  ъ: "",
+  ы: "y",
+  ь: "",
+  э: "e",
+  ю: "yu",
+  я: "ya",
 };
 
 function transliterate(value: string) {
@@ -137,7 +167,10 @@ function makeNotes() {
     .map((body) => ({ body, notedOn: toDay(faker.date.past({ years: 2 })) }));
 }
 
-function makeContact(): { contact: NewContact; notes: { body: string; notedOn: string }[] } {
+function makeContact(): {
+  contact: NewContact;
+  notes: { body: string; notedOn: string }[];
+} {
   const sex = faker.person.sexType();
   const firstName = faker.person.firstName(sex);
   const lastName = faker.person.lastName(sex);
@@ -150,16 +183,19 @@ function makeContact(): { contact: NewContact; notes: { body: string; notedOn: s
 
   const contact: NewContact = {
     name: `${firstName} ${lastName}`,
-    about: faker.helpers.maybe(() => (sex === "male" ? aboutMale : aboutFemale), {
-      probability: 0.9,
-    }) ?? null,
-    howWeMet: faker.helpers.maybe(() => faker.helpers.arrayElement(HOW_WE_MET), {
-      probability: 0.8,
-    }) ?? null,
+    about:
+      faker.helpers.maybe(() => (sex === "male" ? aboutMale : aboutFemale), {
+        probability: 0.9,
+      }) ?? null,
+    howWeMet:
+      faker.helpers.maybe(() => faker.helpers.arrayElement(HOW_WE_MET), {
+        probability: 0.8,
+      }) ?? null,
     phone: faker.helpers.maybe(makePhone, { probability: 0.85 }) ?? null,
     email:
-      faker.helpers.maybe(() => makeEmail(firstName, lastName), { probability: 0.7 }) ??
-      null,
+      faker.helpers.maybe(() => makeEmail(firstName, lastName), {
+        probability: 0.7,
+      }) ?? null,
     contactFrequency: hasFrequency
       ? faker.helpers.arrayElement(contactFrequencies)
       : null,
@@ -169,7 +205,8 @@ function makeContact(): { contact: NewContact; notes: { body: string; notedOn: s
     createdAt,
     updatedAt: createdAt,
   };
-  const contactNotes = faker.helpers.maybe(makeNotes, { probability: 0.55 }) ?? [];
+  const contactNotes =
+    faker.helpers.maybe(makeNotes, { probability: 0.55 }) ?? [];
   return { contact, notes: contactNotes };
 }
 
@@ -181,9 +218,13 @@ async function main() {
   const db = drizzle(client);
 
   try {
-    const [{ value: existing }] = await db.select({ value: count() }).from(contacts);
+    const [{ value: existing }] = await db
+      .select({ value: count() })
+      .from(contacts);
     if (existing > 0) {
-      console.log(`Seed skipped: the contacts table already has ${existing} rows.`);
+      console.log(
+        `Seed skipped: the contacts table already has ${existing} rows.`,
+      );
       return;
     }
 

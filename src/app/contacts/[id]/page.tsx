@@ -6,7 +6,7 @@ import { ContactForm } from "@/components/contact-form";
 import { ContactNotes } from "@/components/contact-notes";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { StatusPill } from "@/components/status-pill";
-import { getContact, listNotes } from "@/lib/contacts";
+import { getContact, listGroups, listNotes } from "@/lib/contacts";
 import { initials } from "@/lib/initials";
 import {
   formatDay,
@@ -18,7 +18,9 @@ export default function ContactPage(props: PageProps<"/contacts/[id]">) {
   return (
     <div className="grid max-w-2xl gap-6">
       <BackToList />
-      <Suspense fallback={<p className="text-muted-foreground">Загружаю контакт…</p>}>
+      <Suspense
+        fallback={<p className="text-muted-foreground">Загружаю контакт…</p>}
+      >
         <ContactDetails {...props} />
       </Suspense>
     </div>
@@ -41,7 +43,10 @@ async function ContactDetails({
   }
 
   const { created } = await searchParams;
-  const notes = await listNotes(contactId);
+  const [notes, groups] = await Promise.all([
+    listNotes(contactId),
+    listGroups(),
+  ]);
 
   const keepInTouchLines = [
     contact.lastContactOn
@@ -80,6 +85,7 @@ async function ContactDetails({
         )}
       </div>
       <ContactForm
+        groups={groups}
         contact={{
           id: contact.id,
           values: {
@@ -90,6 +96,7 @@ async function ContactDetails({
             email: contact.email ?? "",
             frequency: contact.frequency ?? "",
             note: "",
+            groupIds: contact.groupIds.map(String),
           },
           keepInTouchLines,
         }}
@@ -101,9 +108,7 @@ async function ContactDetails({
       />
       {/* Kept apart from "Сохранить", so it is not pressed by mistake */}
       <div className="border-t pt-6">
-        <DeleteContactButton
-          contact={{ id: contact.id, name: contact.name }}
-        />
+        <DeleteContactButton contact={{ id: contact.id, name: contact.name }} />
       </div>
     </>
   );

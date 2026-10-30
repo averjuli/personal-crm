@@ -36,7 +36,10 @@ type ContactNotesProps = {
 
 export function ContactNotes({ contactId, notes, today }: ContactNotesProps) {
   return (
-    <section aria-labelledby="notes-heading" className="grid gap-4 border-t pt-6">
+    <section
+      aria-labelledby="notes-heading"
+      className="grid gap-4 border-t pt-6"
+    >
       <h2 id="notes-heading" className="font-heading text-xl font-medium">
         Заметки
       </h2>
@@ -102,7 +105,11 @@ function Note({ note, today }: { note: NoteItem; today: string }) {
           </p>
           <p className="break-words whitespace-pre-wrap">{note.body}</p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
               Изменить
             </Button>
             <DeleteNoteButton noteId={note.id} />
@@ -247,7 +254,7 @@ function NoteFieldCard({
     <div className="grid content-start gap-1.5">
       <label
         htmlFor={id}
-        className="grid cursor-text gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors hover:not-focus-within:border-border-dashed focus-within:border-foreground has-aria-invalid:border-destructive"
+        className="grid cursor-text gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors focus-within:border-foreground hover:not-focus-within:border-border-dashed has-aria-invalid:border-destructive"
       >
         <span className="text-[0.8125rem] text-subtle-foreground">{label}</span>
         {children}

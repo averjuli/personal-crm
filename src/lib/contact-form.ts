@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { contactFrequencies } from "@/db/schema";
+import { parseGroupIds } from "@/lib/group-form";
 
 // Empty or whitespace-only inputs are stored as NULL
 const optionalText = (max: number) =>
@@ -36,11 +37,16 @@ export const contactInputSchema = z.object({
   note: optionalText(20_000),
 });
 
-export type ContactInput = z.output<typeof contactInputSchema>;
-export type ContactField = keyof ContactInput;
+type ContactFields = z.output<typeof contactInputSchema>;
+export type ContactField = keyof ContactFields;
+
+// The checked groups are not a text field: they come as ids of existing groups
+export type ContactInput = ContactFields & { groupIds: number[] };
 
 // Raw form values echoed back so the form keeps what the user typed
-export type ContactFormValues = Record<ContactField, string>;
+export type ContactFormValues = Record<ContactField, string> & {
+  groupIds: string[];
+};
 
 export type ContactFormState = {
   status: "idle" | "error" | "saved";
@@ -66,6 +72,9 @@ export function readContactForm(formData: FormData): ContactFormValues {
     const raw = formData.get(field);
     values[field] = typeof raw === "string" ? raw : "";
   }
+  values.groupIds = formData
+    .getAll("groupIds")
+    .filter((raw): raw is string => typeof raw === "string");
   return values;
 }
 
@@ -73,7 +82,11 @@ export function parseContactForm(formData: FormData) {
   const values = readContactForm(formData);
   const result = contactInputSchema.safeParse(values);
   if (result.success) {
-    return { success: true as const, data: result.data };
+    const data: ContactInput = {
+      ...result.data,
+      groupIds: parseGroupIds(values.groupIds),
+    };
+    return { success: true as const, data };
   }
   const state: ContactFormState = {
     status: "error",

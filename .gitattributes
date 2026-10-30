@@ -1,3 +1,6 @@
+# LF everywhere, also on Windows: Prettier checks line endings, and the same files run on Linux in CI
+* text=auto eol=lf
+
 # Scripts and configs that run on the Linux server must keep LF line endings even on Windows
 *.sh text eol=lf
 deploy/** text eol=lf
