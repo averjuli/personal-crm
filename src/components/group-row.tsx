@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
@@ -20,6 +20,11 @@ import { formatContactCount, type GroupFormState } from "@/lib/group-form";
 
 const initialState: GroupFormState = { status: "idle" };
 
+// Phone: icon-only 44px squares, like the buttons in «Пора связаться»;
+// the hidden text stays the button name for screen readers
+const rowButtonClassName = "max-sm:size-11 max-sm:p-0";
+const rowIconClassName = "size-3.5 max-sm:size-4";
+
 type GroupRowProps = {
   group: { id: number; name: string; contactCount: number };
 };
@@ -31,8 +36,10 @@ export function GroupRow({ group }: GroupRowProps) {
       {editing ? (
         <RenameForm group={group} onDone={() => setEditing(false)} />
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
+        // No wrapping: the buttons stay top right whatever the name length,
+        // a long name wraps in its own column
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1">
             <Link
               href={`/?group=${group.id}`}
               className="font-semibold break-words underline-offset-4 hover:underline"
@@ -43,13 +50,16 @@ export function GroupRow({ group }: GroupRowProps) {
               {formatContactCount(group.contactCount)}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 gap-2">
             <Button
               variant="outline"
               size="sm"
+              title="Переименовать"
+              className={rowButtonClassName}
               onClick={() => setEditing(true)}
             >
-              Переименовать
+              <Pencil aria-hidden="true" className={rowIconClassName} />
+              <span className="max-sm:sr-only">Переименовать</span>
             </Button>
             <DeleteGroupButton group={group} />
           </div>
@@ -118,9 +128,18 @@ function RenameForm({
 function DeleteGroupButton({ group }: GroupRowProps) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger render={<Button variant="destructive" size="sm" />}>
-        <Trash2 aria-hidden="true" data-icon="inline-start" />
-        Удалить
+      <AlertDialogTrigger
+        render={
+          <Button
+            variant="destructive"
+            size="sm"
+            title="Удалить"
+            className={rowButtonClassName}
+          />
+        }
+      >
+        <Trash2 aria-hidden="true" className={rowIconClassName} />
+        <span className="max-sm:sr-only">Удалить</span>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
