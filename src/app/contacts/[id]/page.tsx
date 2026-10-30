@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { BackToList } from "@/components/back-to-list";
@@ -37,6 +38,9 @@ async function ContactDetails({
     notFound();
   }
 
+  // getContact reads today's date from the clock, which Next allows only once
+  // the card is rendered per request
+  await connection();
   const contact = await getContact(contactId);
   if (!contact) {
     notFound();

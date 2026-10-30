@@ -18,6 +18,24 @@ jobs:
     name: Lint, format, types, Vitest
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    services:
+      # Logic tests run against a real database; they create crm_test next to it
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Throwaway CI database, not a secret
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm
     steps:
       - uses: actions/checkout@v7
 

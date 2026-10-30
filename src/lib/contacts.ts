@@ -16,7 +16,7 @@ import {
 import { db } from "@/db";
 import { contactGroups, contacts, groups, notes } from "@/db/schema";
 import type { ContactInput } from "@/lib/contact-form";
-import { APP_TIME_ZONE } from "@/lib/keep-in-touch";
+import { todayInAppTimeZone } from "@/lib/keep-in-touch";
 import type { NoteInput } from "@/lib/note-form";
 
 export type ContactListItem = Awaited<ReturnType<typeof listContacts>>[number];
@@ -29,8 +29,11 @@ function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
-// Today in the app time zone; the constant is not user input
-const today = sql<string>`(now() at time zone ${sql.raw(`'${APP_TIME_ZONE}'`)})::date`;
+// Today in the app time zone by the app's clock, not the database's: the
+// same day the note form checks against, and tests can set it
+function today() {
+  return sql<string>`${todayInAppTimeZone()}::date`;
+}
 
 // Last communication: the latest of the notes and the "Already contacted" mark.
 // greatest() ignores nulls and is null only when both are null
@@ -56,7 +59,9 @@ const dueOn = sql<
 end)::date`;
 
 // Days past the due day; 0 means "due today"
-const overdueDays = sql<number | null>`(${today} - ${dueOn})`;
+function overdueDays() {
+  return sql<number | null>`(${today()} - ${dueOn})`;
+}
 
 // Names of the contact's groups in alphabetical order (ICU collation, as for
 // contact names); an empty array for a contact without groups. Written by
@@ -116,10 +121,12 @@ export async function listOverdueContacts() {
       id: contacts.id,
       name: contacts.name,
       frequency: contacts.contactFrequency,
-      overdueDays: sql<number>`${overdueDays}`,
+      overdueDays: sql<number>`${overdueDays()}`,
     })
     .from(contacts)
-    .where(and(isNotNull(contacts.contactFrequency), sql`${dueOn} <= ${today}`))
+    .where(
+      and(isNotNull(contacts.contactFrequency), sql`${dueOn} <= ${today()}`),
+    )
     .orderBy(
       asc(dueOn),
       sql`${contacts.name} collate "ru-x-icu"`,
@@ -139,7 +146,7 @@ export async function getContact(id: number) {
       frequency: contacts.contactFrequency,
       lastContactOn,
       dueOn,
-      overdueDays,
+      overdueDays: overdueDays(),
     })
     .from(contacts)
     .where(eq(contacts.id, id))
@@ -175,13 +182,13 @@ export async function createContact(input: ContactInput) {
       .values({
         ...fields,
         contactFrequency: frequency,
-        frequencySetOn: frequency ? today : null,
+        frequencySetOn: frequency ? today() : null,
       })
       .returning({ id: contacts.id });
     if (note) {
       await tx
         .insert(notes)
-        .values({ contactId: created.id, body: note, notedOn: today });
+        .values({ contactId: created.id, body: note, notedOn: today() });
     }
     await setContactGroups(tx, created.id, groupIds);
     return created.id;
@@ -205,7 +212,7 @@ export async function updateContact(
         // side of SET sees the old row
         frequencySetOn: sql`case
           when ${frequency}::text is null then null
-          when ${contacts.contactFrequency} is null then ${today}
+          when ${contacts.contactFrequency} is null then ${today()}
           else ${contacts.frequencySetOn}
         end`,
         // "Not set" also forgets the skip, otherwise an old skip would move the
@@ -415,7 +422,7 @@ export async function markKeepInTouch(
     }
     const [updated] = await tx
       .update(contacts)
-      .set({ [field]: today })
+      .set({ [field]: today() })
       .where(eq(contacts.id, id))
       .returning({ applied: column });
     return { previous: current.previous, applied: updated.applied! };
