@@ -126,8 +126,7 @@ export async function deleteNoteAction(noteId: number) {
 }
 
 export type KeepInTouchResult =
-  | { ok: true; change: KeepInTouchChange }
-  | { ok: false; message: string };
+  { ok: true; change: KeepInTouchChange } | { ok: false; message: string };
 
 async function markAction(
   contactId: number,

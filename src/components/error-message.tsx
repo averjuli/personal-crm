@@ -24,18 +24,25 @@ export function ErrorMessage({ error, retry }: ErrorPageProps) {
         Что-то пошло не так
       </h1>
       <p className="text-muted-foreground">
-        Не получилось открыть страницу. Обычно это ненадолго: попробуйте ещё раз.
+        Не получилось открыть страницу. Обычно это ненадолго: попробуйте ещё
+        раз.
       </p>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
         <Button onClick={() => retry()}>
-          <RotateCw aria-hidden="true" strokeWidth={2.5} data-icon="inline-start" />
+          <RotateCw
+            aria-hidden="true"
+            strokeWidth={2.5}
+            data-icon="inline-start"
+          />
           Попробовать ещё раз
         </Button>
         <BackToList />
       </div>
       {error?.digest && (
         // The same code is in the server log: ssh crm sudo crm-deploy logs
-        <p className="text-sm text-subtle-foreground">Код ошибки: {error.digest}</p>
+        <p className="text-sm text-subtle-foreground">
+          Код ошибки: {error.digest}
+        </p>
       )}
     </div>
   );

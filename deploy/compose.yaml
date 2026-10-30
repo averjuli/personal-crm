@@ -24,7 +24,11 @@ services:
       - db-data:/var/lib/postgresql
     healthcheck:
       # Over TCP: while a new database initializes, Postgres listens on its socket only
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -44,7 +48,8 @@ services:
       # nginx proxies app.vupsen.space here
       - "127.0.0.1:3000:3000"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
+      test:
+        ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 3

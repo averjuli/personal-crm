@@ -18,7 +18,9 @@ export default function ContactPage(props: PageProps<"/contacts/[id]">) {
   return (
     <div className="grid max-w-2xl gap-6">
       <BackToList />
-      <Suspense fallback={<p className="text-muted-foreground">Загружаю контакт…</p>}>
+      <Suspense
+        fallback={<p className="text-muted-foreground">Загружаю контакт…</p>}
+      >
         <ContactDetails {...props} />
       </Suspense>
     </div>
@@ -106,9 +108,7 @@ async function ContactDetails({
       />
       {/* Kept apart from "Сохранить", so it is not pressed by mistake */}
       <div className="border-t pt-6">
-        <DeleteContactButton
-          contact={{ id: contact.id, name: contact.name }}
-        />
+        <DeleteContactButton contact={{ id: contact.id, name: contact.name }} />
       </div>
     </>
   );

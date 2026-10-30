@@ -44,7 +44,11 @@ export function GroupRow({ group }: GroupRowProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
               Переименовать
             </Button>
             <DeleteGroupButton group={group} />

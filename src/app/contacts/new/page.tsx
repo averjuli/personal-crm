@@ -11,7 +11,9 @@ export default function NewContactPage() {
       <h1 className="font-heading text-title font-medium lg:text-title-lg">
         Новый контакт
       </h1>
-      <Suspense fallback={<p className="text-muted-foreground">Загружаю форму…</p>}>
+      <Suspense
+        fallback={<p className="text-muted-foreground">Загружаю форму…</p>}
+      >
         <NewContactForm />
       </Suspense>
     </div>

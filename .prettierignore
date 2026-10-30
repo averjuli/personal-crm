@@ -1,0 +1,12 @@
+# Generated files
+pnpm-lock.yaml
+drizzle/
+src/components/ui/
+
+# Docs and specs: written by hand, not code
+*.md
+openspec/
+specs/
+
+# Claude Code settings and skills
+.claude/

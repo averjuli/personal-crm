@@ -36,8 +36,8 @@ const today = sql<string>`(now() at time zone ${sql.raw(`'${APP_TIME_ZONE}'`)}):
 // greatest() ignores nulls and is null only when both are null
 const lastContactOn = sql<
   string | null
-// Written by hand: in a single-table query drizzle drops table names from
-// columns, and the subquery would compare notes.id with itself
+  // Written by hand: in a single-table query drizzle drops table names from
+  // columns, and the subquery would compare notes.id with itself
 >`greatest((select max(n.noted_on) from notes n where n.contact_id = contacts.id), ${contacts.contactedOn})`;
 
 // The countdown starts from the later of the last communication and the last
@@ -46,7 +46,9 @@ const countdownStart = sql`coalesce(greatest(${lastContactOn}, ${contacts.skippe
 
 // The day to get in touch; null without a frequency. Postgres clamps a month
 // step to the end of a shorter month: 31 Jan + 1 month = 28 Feb
-const dueOn = sql<string | null>`(${countdownStart} + case ${contacts.contactFrequency}
+const dueOn = sql<
+  string | null
+>`(${countdownStart} + case ${contacts.contactFrequency}
   when 'week' then interval '7 days'
   when 'month' then interval '1 month'
   when 'quarter' then interval '3 months'
@@ -70,39 +72,41 @@ const groupNames = sql<string[]>`coalesce((
 // result further. Either part may be absent
 export async function listContacts(search: string, groupId: number | null) {
   const pattern = `%${escapeLike(search)}%`;
-  return db
-    .select({
-      id: contacts.id,
-      name: contacts.name,
-      about: contacts.about,
-      phone: contacts.phone,
-      email: contacts.email,
-      frequency: contacts.contactFrequency,
-      groupNames,
-    })
-    .from(contacts)
-    .where(
-      and(
-        search
-          ? or(
-              ilike(contacts.name, pattern),
-              sql`exists (
+  return (
+    db
+      .select({
+        id: contacts.id,
+        name: contacts.name,
+        about: contacts.about,
+        phone: contacts.phone,
+        email: contacts.email,
+        frequency: contacts.contactFrequency,
+        groupNames,
+      })
+      .from(contacts)
+      .where(
+        and(
+          search
+            ? or(
+                ilike(contacts.name, pattern),
+                sql`exists (
                 select 1 from contact_groups cg
                 join groups g on g.id = cg.group_id
                 where cg.contact_id = contacts.id and g.name ilike ${pattern}
               )`,
-            )
-          : undefined,
-        groupId !== null
-          ? sql`exists (
+              )
+            : undefined,
+          groupId !== null
+            ? sql`exists (
               select 1 from contact_groups cg
               where cg.contact_id = contacts.id and cg.group_id = ${groupId}
             )`
-          : undefined,
-      ),
-    )
-    // ICU collation sorts Cyrillic alphabetically (Ё after Е, case-insensitive)
-    .orderBy(sql`${contacts.name} collate "ru-x-icu"`, asc(contacts.id));
+            : undefined,
+        ),
+      )
+      // ICU collation sorts Cyrillic alphabetically (Ё after Е, case-insensitive)
+      .orderBy(sql`${contacts.name} collate "ru-x-icu"`, asc(contacts.id))
+  );
 }
 
 // Contacts whose due day has come, the most overdue first
@@ -241,7 +245,9 @@ async function setContactGroups(
     .where(
       and(
         eq(contactGroups.contactId, contactId),
-        existing.length ? notInArray(contactGroups.groupId, existing) : undefined,
+        existing.length
+          ? notInArray(contactGroups.groupId, existing)
+          : undefined,
       ),
     );
   if (existing.length) {
@@ -372,7 +378,7 @@ export async function deleteGroup(id: number) {
   return deleted.length > 0;
 }
 
-export type KeepInTouchKind ="contacted" | "skipped";
+export type KeepInTouchKind = "contacted" | "skipped";
 
 export type KeepInTouchChange = {
   // Values of the field before and after the click, for the undo

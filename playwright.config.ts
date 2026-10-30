@@ -20,7 +20,9 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   // Edge installed on the machine: Chromium engine, nothing to download
-  projects: [{ name: "edge", use: { ...devices["Desktop Edge"], channel: "msedge" } }],
+  projects: [
+    { name: "edge", use: { ...devices["Desktop Edge"], channel: "msedge" } },
+  ],
   webServer: {
     // A production build: the same code that runs on the server. `next start`
     // warns about output: standalone, but serves the build fine

@@ -8,7 +8,9 @@ function isRealDay(value: string) {
     return false;
   }
   const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  return (
+    !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value)
+  );
 }
 
 export const noteInputSchema = z.object({

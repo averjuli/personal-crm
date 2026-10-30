@@ -12,7 +12,9 @@ export default function GroupsPage() {
       <h1 className="font-heading text-title font-medium lg:text-title-lg">
         Группы
       </h1>
-      <Suspense fallback={<p className="text-muted-foreground">Загружаю группы…</p>}>
+      <Suspense
+        fallback={<p className="text-muted-foreground">Загружаю группы…</p>}
+      >
         <GroupsSection />
       </Suspense>
     </div>

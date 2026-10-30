@@ -6,11 +6,7 @@ import { ContactsTable } from "@/components/contacts-table";
 import { OverdueContacts } from "@/components/overdue-contacts";
 import { StatusPill } from "@/components/status-pill";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  listContacts,
-  listGroups,
-  listOverdueContacts,
-} from "@/lib/contacts";
+import { listContacts, listGroups, listOverdueContacts } from "@/lib/contacts";
 import { parseGroupParam } from "@/lib/group-filter";
 
 // Render the list in the first HTML instead of streaming it behind a
@@ -26,12 +22,19 @@ export default function HomePage({ searchParams }: PageProps<"/">) {
           Контакты
         </h1>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/groups" className={buttonVariants({ variant: "outline" })}>
+          <Link
+            href="/groups"
+            className={buttonVariants({ variant: "outline" })}
+          >
             <Tags aria-hidden="true" data-icon="inline-start" />
             Группы
           </Link>
           <Link href="/contacts/new" className={buttonVariants()}>
-            <Plus aria-hidden="true" strokeWidth={2.5} data-icon="inline-start" />
+            <Plus
+              aria-hidden="true"
+              strokeWidth={2.5}
+              data-icon="inline-start"
+            />
             Добавить контакт
           </Link>
         </div>

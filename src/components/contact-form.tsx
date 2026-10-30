@@ -212,7 +212,7 @@ function Field({
     <div className="grid content-start gap-1.5">
       <label
         htmlFor={name}
-        className="grid cursor-text gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors hover:not-focus-within:border-border-dashed focus-within:border-foreground has-aria-invalid:border-destructive"
+        className="grid cursor-text gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors focus-within:border-foreground hover:not-focus-within:border-border-dashed has-aria-invalid:border-destructive"
       >
         <span className="text-[0.8125rem] text-subtle-foreground">
           {label}
@@ -250,7 +250,7 @@ function FrequencyField({
     <div className="grid content-start gap-1.5">
       <label
         htmlFor="frequency"
-        className="grid cursor-pointer gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors hover:not-focus-within:border-border-dashed focus-within:border-foreground has-aria-invalid:border-destructive"
+        className="grid cursor-pointer gap-1 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5 transition-colors focus-within:border-foreground hover:not-focus-within:border-border-dashed has-aria-invalid:border-destructive"
       >
         <span className="text-[0.8125rem] text-subtle-foreground">
           Как часто общаться
@@ -353,14 +353,17 @@ function GroupsField({
       aria-labelledby="groups-label"
       className="grid content-start gap-3 rounded-xl border-[1.5px] border-border bg-card px-4.5 py-3.5"
     >
-      <span id="groups-label" className="text-[0.8125rem] text-subtle-foreground">
+      <span
+        id="groups-label"
+        className="text-[0.8125rem] text-subtle-foreground"
+      >
         Группы
       </span>
       {all.length > 0 ? (
         <ul className="flex flex-wrap gap-2">
           {all.map((group) => (
             <li key={group.id}>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-[1.5px] border-border px-3 py-1.5 text-sm font-semibold transition-colors hover:border-border-dashed has-checked:border-foreground has-checked:bg-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-solid has-focus-visible:outline-ring">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-[1.5px] border-border px-3 py-1.5 text-sm font-semibold transition-colors hover:border-border-dashed has-checked:border-foreground has-checked:bg-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring has-focus-visible:outline-solid">
                 <input
                   type="checkbox"
                   name="groupIds"

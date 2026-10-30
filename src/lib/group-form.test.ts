@@ -47,7 +47,9 @@ describe("parseGroupIds", () => {
   });
 
   it("drops values that are not ids", () => {
-    expect(parseGroupIds(["", "abc", "0", "-1", "1.5", "2147483648", "5"])).toEqual([5]);
+    expect(
+      parseGroupIds(["", "abc", "0", "-1", "1.5", "2147483648", "5"]),
+    ).toEqual([5]);
   });
 
   it("returns an empty list when nothing is checked", () => {

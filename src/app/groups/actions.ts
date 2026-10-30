@@ -2,11 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import {
-  createGroup,
-  deleteGroup,
-  renameGroup,
-} from "@/lib/contacts";
+import { createGroup, deleteGroup, renameGroup } from "@/lib/contacts";
 import {
   GROUP_TAKEN_MESSAGE,
   groupNameSchema,
