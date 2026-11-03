@@ -14,6 +14,7 @@ import {
   formatOverdue,
   todayInAppTimeZone,
 } from "@/lib/keep-in-touch";
+import { requireUserId } from "@/lib/session";
 
 export default function ContactPage(props: PageProps<"/contacts/[id]">) {
   return (
@@ -32,6 +33,7 @@ async function ContactDetails({
   params,
   searchParams,
 }: PageProps<"/contacts/[id]">) {
+  const ownerId = await requireUserId();
   const { id } = await params;
   const contactId = Number(id);
   if (!Number.isSafeInteger(contactId) || contactId <= 0) {
@@ -41,15 +43,15 @@ async function ContactDetails({
   // getContact reads today's date from the clock, which Next allows only once
   // the card is rendered per request
   await connection();
-  const contact = await getContact(contactId);
+  const contact = await getContact(ownerId, contactId);
   if (!contact) {
     notFound();
   }
 
   const { created } = await searchParams;
   const [notes, groups] = await Promise.all([
-    listNotes(contactId),
-    listGroups(),
+    listNotes(ownerId, contactId),
+    listGroups(ownerId),
   ]);
 
   const keepInTouchLines = [

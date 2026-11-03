@@ -9,6 +9,7 @@ import { contactGroups, contacts, groups } from "@/db/schema";
 
 import { e2eDatabaseUrl } from "./database";
 import { resetDatabase } from "./global-setup";
+import { e2eUser } from "./test-user";
 
 async function withDatabase<T>(
   work: (db: ReturnType<typeof drizzle>) => Promise<T>,
@@ -34,7 +35,7 @@ async function putIntoGroup(groupName: string, contactNames: string[]) {
       (
         await db
           .insert(groups)
-          .values({ name: groupName })
+          .values({ name: groupName, ownerId: e2eUser.id })
           .returning({ id: groups.id })
       )[0];
     if (contactNames.length) {

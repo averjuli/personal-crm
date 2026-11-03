@@ -7,7 +7,8 @@ import { OverdueContacts } from "@/components/overdue-contacts";
 import { StatusPill } from "@/components/status-pill";
 import { buttonVariants } from "@/components/ui/button";
 import { listContacts, listGroups, listOverdueContacts } from "@/lib/contacts";
-import { parseGroupParam } from "@/lib/group-filter";
+import { findSelectedGroup } from "@/lib/group-filter";
+import { requireUserId } from "@/lib/session";
 
 // Render the list in the first HTML instead of streaming it behind a
 // "loading" placeholder: the query takes milliseconds, while swapping
@@ -47,18 +48,18 @@ export default function HomePage({ searchParams }: PageProps<"/">) {
 async function ContactsSection({
   searchParams,
 }: Pick<PageProps<"/">, "searchParams">) {
+  const ownerId = await requireUserId();
   const { q, group, deleted } = await searchParams;
   const search = (typeof q === "string" ? q : "").trim();
-  const groups = await listGroups();
-  // An unknown or broken ?group= means "Все группы"
-  const requestedGroupId = parseGroupParam(group);
-  const selectedGroup = groups.find((item) => item.id === requestedGroupId);
+  const groups = await listGroups(ownerId);
+  // An unknown, broken or foreign ?group= means "Все группы"
+  const selectedGroup = findSelectedGroup(groups, group);
   const groupId = selectedGroup?.id ?? null;
   // The "time to reach out" block is hidden while searching and is not
   // filtered by group
   const [contacts, overdue] = await Promise.all([
-    listContacts(search, groupId),
-    search ? null : listOverdueContacts(),
+    listContacts(ownerId, search, groupId),
+    search ? null : listOverdueContacts(ownerId),
   ]);
 
   return (
@@ -89,7 +90,7 @@ async function ContactsSection({
             ? "Никого не нашли. Попробуйте написать имя иначе."
             : selectedGroup
               ? "В этой группе пока нет контактов"
-              : "Пока нет ни одного контакта. Нажмите «Добавить контакт»."}
+              : "Пока нет ни одного контакта. Добавь первый контакт."}
         </p>
       )}
     </div>

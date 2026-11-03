@@ -29,6 +29,10 @@ import {
 import { formatOverdue, frequencyLabels } from "@/lib/keep-in-touch";
 
 import { truncateAllTables } from "../../testing/database";
+import { createTestUser } from "../../testing/users";
+
+// The user whose data every test works with
+let owner: string;
 
 type TestContact = { id: number; name: string };
 
@@ -48,7 +52,7 @@ async function newContact(
   name: string,
   frequency: ContactFrequency | null = null,
 ): Promise<TestContact> {
-  const id = await createContact({
+  const id = await createContact(owner, {
     name,
     about: null,
     howWeMet: null,
@@ -65,7 +69,7 @@ async function setFrequency(
   contact: TestContact,
   frequency: ContactFrequency | null,
 ) {
-  await updateContact(contact.id, {
+  await updateContact(owner, contact.id, {
     name: contact.name,
     about: null,
     howWeMet: null,
@@ -81,19 +85,21 @@ async function note(
   notedOn: string,
   body = "Созвонились",
 ) {
-  await addNote(contact.id, { body, notedOn });
+  await addNote(owner, contact.id, { body, notedOn });
 }
 
 async function card(contact: TestContact) {
-  return (await getContact(contact.id))!;
+  return (await getContact(owner, contact.id))!;
 }
 
 async function overdueNames() {
-  return (await listOverdueContacts()).map((row) => row.name);
+  return (await listOverdueContacts(owner)).map((row) => row.name);
 }
 
 async function overdueRow(contact: TestContact) {
-  return (await listOverdueContacts()).find((row) => row.id === contact.id);
+  return (await listOverdueContacts(owner)).find(
+    (row) => row.id === contact.id,
+  );
 }
 
 // A contact with the frequency set long ago and the last note on the given day
@@ -112,6 +118,7 @@ async function contactWithNote(
 
 beforeEach(async () => {
   await db.execute(sql.raw(truncateAllTables));
+  owner = await createTestUser("owner@example.com");
   vi.useFakeTimers({ toFake: ["Date"] });
   setToday("2026-10-24");
 });
@@ -157,7 +164,7 @@ describe("last communication", () => {
   it("is the note when it is later than the mark", async () => {
     const contact = await newContact("Анна Смирнова", "week");
     setToday("2026-10-10");
-    await markKeepInTouch(contact.id, "contacted");
+    await markKeepInTouch(owner, contact.id, "contacted");
     await note(contact, "2026-10-20");
     setToday("2026-10-24");
 
@@ -167,7 +174,7 @@ describe("last communication", () => {
   it("is the mark when it is later than the note", async () => {
     const contact = await newContact("Анна Смирнова", "week");
     await note(contact, "2026-10-01");
-    await markKeepInTouch(contact.id, "contacted");
+    await markKeepInTouch(owner, contact.id, "contacted");
 
     expect((await card(contact)).lastContactOn).toBe("2026-10-24");
   });
@@ -178,7 +185,7 @@ describe("last communication", () => {
       "month",
       "2026-09-12",
     );
-    await markKeepInTouch(contact.id, "skipped");
+    await markKeepInTouch(owner, contact.id, "skipped");
 
     expect((await card(contact)).lastContactOn).toBe("2026-09-12");
   });
@@ -212,9 +219,12 @@ describe("countdown start", () => {
       "week",
       "2026-10-20",
     );
-    const [last] = await listNotes(contact.id);
+    const [last] = await listNotes(owner, contact.id);
 
-    await updateNote(last.id, { body: "Другой текст", notedOn: "2026-10-20" });
+    await updateNote(owner, last.id, {
+      body: "Другой текст",
+      notedOn: "2026-10-20",
+    });
 
     expect((await card(contact)).dueOn).toBe("2026-10-27");
   });
@@ -226,9 +236,12 @@ describe("countdown start", () => {
       "2026-10-05",
     );
     await note(contact, "2026-10-20");
-    const [last] = await listNotes(contact.id);
+    const [last] = await listNotes(owner, contact.id);
 
-    await updateNote(last.id, { body: last.body, notedOn: "2026-10-01" });
+    await updateNote(owner, last.id, {
+      body: last.body,
+      notedOn: "2026-10-01",
+    });
 
     // The latest note is now the one of 5 October
     expect((await card(contact)).dueOn).toBe("2026-10-12");
@@ -241,12 +254,12 @@ describe("countdown start", () => {
       "2026-10-05",
     );
     setToday("2026-10-10");
-    await markKeepInTouch(contact.id, "contacted");
+    await markKeepInTouch(owner, contact.id, "contacted");
     setToday("2026-10-24");
     await note(contact, "2026-10-20");
-    const [latest] = await listNotes(contact.id);
+    const [latest] = await listNotes(owner, contact.id);
 
-    await deleteNote(latest.id);
+    await deleteNote(owner, latest.id);
 
     // The mark of 10 October is later than the note of 5 October
     expect((await card(contact)).dueOn).toBe("2026-11-10");
@@ -257,9 +270,9 @@ describe("countdown start", () => {
     const contact = await newContact("Анна Смирнова", "month");
     setToday("2026-10-24");
     await note(contact, "2026-10-20");
-    const [only] = await listNotes(contact.id);
+    const [only] = await listNotes(owner, contact.id);
 
-    await deleteNote(only.id);
+    await deleteNote(owner, only.id);
 
     expect((await card(contact)).dueOn).toBe("2026-10-01");
   });
@@ -290,7 +303,7 @@ describe("countdown start", () => {
       addDays("2026-10-24", -20),
     );
 
-    await markKeepInTouch(contact.id, "skipped");
+    await markKeepInTouch(owner, contact.id, "skipped");
 
     expect((await card(contact)).dueOn).toBe("2026-10-31");
   });
@@ -299,7 +312,7 @@ describe("countdown start", () => {
     setToday("2026-10-01");
     const contact = await newContact("Анна Смирнова", "week");
     setToday(addDays("2026-10-24", -3));
-    await markKeepInTouch(contact.id, "skipped");
+    await markKeepInTouch(owner, contact.id, "skipped");
     await setFrequency(contact, null);
     setToday("2026-10-24");
 
@@ -404,15 +417,15 @@ describe("«Уже связался»", () => {
       "week",
       addDays("2026-10-24", -7 - 5),
     );
-    const notesBefore = await listNotes(contact.id);
+    const notesBefore = await listNotes(owner, contact.id);
 
-    await markKeepInTouch(contact.id, "contacted");
+    await markKeepInTouch(owner, contact.id, "contacted");
 
     expect(await overdueNames()).toEqual([]);
     const updated = await card(contact);
     expect(updated.lastContactOn).toBe("2026-10-24");
     expect(updated.dueOn).toBe("2026-10-31");
-    expect(await listNotes(contact.id)).toEqual(notesBefore);
+    expect(await listNotes(owner, contact.id)).toEqual(notesBefore);
   });
 });
 
@@ -424,7 +437,7 @@ describe("«Пропустить этот раз»", () => {
       "2026-09-12",
     );
 
-    await markKeepInTouch(contact.id, "skipped");
+    await markKeepInTouch(owner, contact.id, "skipped");
 
     expect(await overdueNames()).toEqual([]);
     const updated = await card(contact);
@@ -437,7 +450,7 @@ describe("«Пропустить этот раз»", () => {
     setToday("2026-10-01");
     const contact = await newContact("Анна Смирнова", "week");
     setToday("2026-10-24");
-    await markKeepInTouch(contact.id, "skipped");
+    await markKeepInTouch(owner, contact.id, "skipped");
 
     setToday("2026-10-30");
     expect(await overdueNames()).toEqual([]);
@@ -450,14 +463,14 @@ describe("undo", () => {
   it("undoing «Уже связался» brings back the previous mark", async () => {
     const contact = await contactWithNote("Борис Орлов", "week", "2026-10-05");
     setToday("2026-10-14");
-    await markKeepInTouch(contact.id, "contacted");
+    await markKeepInTouch(owner, contact.id, "contacted");
     setToday("2026-10-24");
     const before = await card(contact);
     const overdueBefore = (await overdueRow(contact))!.overdueDays;
 
-    const change = (await markKeepInTouch(contact.id, "contacted"))!;
+    const change = (await markKeepInTouch(owner, contact.id, "contacted"))!;
     expect(await overdueNames()).toEqual([]);
-    await undoKeepInTouch(contact.id, "contacted", change);
+    await undoKeepInTouch(owner, contact.id, "contacted", change);
 
     expect((await overdueRow(contact))?.overdueDays).toBe(overdueBefore);
     expect((await card(contact)).lastContactOn).toBe(before.lastContactOn);
@@ -468,9 +481,9 @@ describe("undo", () => {
     const before = await card(contact);
     const overdueBefore = (await overdueRow(contact))!.overdueDays;
 
-    const change = (await markKeepInTouch(contact.id, "skipped"))!;
+    const change = (await markKeepInTouch(owner, contact.id, "skipped"))!;
     expect(await overdueNames()).toEqual([]);
-    await undoKeepInTouch(contact.id, "skipped", change);
+    await undoKeepInTouch(owner, contact.id, "skipped", change);
 
     expect((await overdueRow(contact))?.overdueDays).toBe(overdueBefore);
     expect((await card(contact)).dueOn).toBe(before.dueOn);
@@ -482,7 +495,7 @@ describe("frequency in the contact list", () => {
     await newContact("Анна Смирнова", "year");
     await newContact("Борис Кузнецов");
 
-    const rows = await listContacts("", null);
+    const rows = await listContacts(owner, "", null);
     expect(rows.map((row) => [row.name, row.frequency])).toEqual([
       ["Анна Смирнова", "year"],
       ["Борис Кузнецов", null],
@@ -525,7 +538,7 @@ describe("last and next communication in the card", () => {
 
   it("counts the mark without notes as the last communication", async () => {
     const contact = await newContact("Анна Смирнова", "week");
-    await markKeepInTouch(contact.id, "contacted");
+    await markKeepInTouch(owner, contact.id, "contacted");
 
     expect((await card(contact)).lastContactOn).toBe("2026-10-24");
   });

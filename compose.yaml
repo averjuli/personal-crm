@@ -20,5 +20,23 @@ services:
       timeout: 5s
       retries: 10
 
+  # Catches every email the app sends locally; nothing leaves this machine
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    restart: unless-stopped
+    environment:
+      # Without this Mailpit looks up the name of every client first, and the
+      # SMTP greeting comes ~8 seconds late, longer than Nodemailer waits
+      MP_SMTP_DISABLE_RDNS: "true"
+    ports:
+      # SMTP for the app and the tests, web page with the received emails
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   db-data:

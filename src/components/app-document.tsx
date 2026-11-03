@@ -1,13 +1,21 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-// The page frame with the header, shared by the root layout and global-error.tsx
-export function AppDocument({ children }: { children: ReactNode }) {
+// The page frame with the header, shared by the root layout and global-error.tsx.
+// headerEnd is the right side of the header (the user and «Выйти»); global-error.tsx
+// passes nothing, because the session cannot be read there
+export function AppDocument({
+  children,
+  headerEnd,
+}: {
+  children: ReactNode;
+  headerEnd?: ReactNode;
+}) {
   return (
     <html lang="ru" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
         <header className="border-b">
-          <div className="mx-auto flex w-full max-w-page items-center px-6 py-4 lg:px-10 lg:py-5">
+          <div className="mx-auto flex w-full max-w-page items-center justify-between gap-4 px-6 py-4 lg:px-10 lg:py-5">
             {/* Same logo as the landing header: lime dot with an ink outline */}
             <Link
               href="/"
@@ -21,6 +29,7 @@ export function AppDocument({ children }: { children: ReactNode }) {
                 Личная CRM
               </span>
             </Link>
+            {headerEnd}
           </div>
         </header>
         <main className="mx-auto w-full max-w-page flex-1 px-6 py-8 lg:px-10 lg:py-12">

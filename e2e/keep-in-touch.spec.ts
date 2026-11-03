@@ -9,6 +9,7 @@ import { formatDay, todayInAppTimeZone } from "@/lib/keep-in-touch";
 
 import { e2eDatabaseUrl } from "./database";
 import { resetDatabase } from "./global-setup";
+import { e2eUser } from "./test-user";
 
 const noteText = "Созвонились, обсудили отпуск";
 
@@ -25,7 +26,12 @@ async function addOverdueContact(name: string) {
     const db = drizzle(client);
     const [contact] = await db
       .insert(contacts)
-      .values({ name, contactFrequency: "week", frequencySetOn: daysAgo(30) })
+      .values({
+        ownerId: e2eUser.id,
+        name,
+        contactFrequency: "week",
+        frequencySetOn: daysAgo(30),
+      })
       .returning({ id: contacts.id });
     await db
       .insert(notes)

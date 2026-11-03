@@ -1,8 +1,9 @@
-// Applies pending migrations from ./drizzle. Runs on the server before every deploy;
-// locally `pnpm db:migrate` (drizzle-kit) does the same and keeps the same history table.
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
+// Applies pending migrations from ./drizzle. Runs on the server before every deploy
+// and locally as `pnpm db:migrate`. OWNER_EMAIL is the user who gets the contacts
+// and groups that existed before sign-in (migration 0003).
 import postgres from "postgres";
+
+import { applyMigrations } from "./migrations";
 
 // How many migrations the history table (shared with drizzle-kit) lists
 async function appliedCount(client: postgres.Sql) {
@@ -26,7 +27,7 @@ async function main() {
 
   try {
     const before = await appliedCount(client);
-    await migrate(drizzle(client), { migrationsFolder: "drizzle" });
+    await applyMigrations(client, process.env.OWNER_EMAIL);
     const after = await appliedCount(client);
     console.log(
       `Migrations: ${after - before} applied now, ${after} in total.`,

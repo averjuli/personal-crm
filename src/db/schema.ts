@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   index,
@@ -11,6 +12,107 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+// Tables of Better Auth (fields as in the installed version; the adapter maps
+// the camelCase property names to these snake_case columns). Ids are text:
+// Better Auth generates them
+export const users = pgTable("users", {
+  id: text("id").primaryKey(),
+  // Better Auth requires the field; the app never asks for a name
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("sessions_user_id_idx").on(table.userId)],
+);
+
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("accounts_user_id_idx").on(table.userId)],
+);
+
+// Sign-in links (magic link tokens) live here too
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("verifications_identifier_idx").on(table.identifier)],
+);
+
+// One row per sign-in email sent to an address: the rate limit (3 per 10
+// minutes) counts these rows
+export const signInEmails = pgTable(
+  "sign_in_emails",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    email: text("email").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("sign_in_emails_email_sent_at_idx").on(table.email, table.sentAt),
+  ],
+);
+
 export const contactFrequencies = ["week", "month", "quarter", "year"] as const;
 export type ContactFrequency = (typeof contactFrequencies)[number];
 
@@ -18,6 +120,11 @@ export const contacts = pgTable(
   "contacts",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    // Who this contact belongs to; never changes. No cascade: accounts are
+    // never deleted
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => users.id),
     name: text("name").notNull(),
     // Who this person is: role, relation, short description
     about: text("about"),
@@ -44,6 +151,7 @@ export const contacts = pgTable(
       .defaultNow(),
   },
   (table) => [
+    index("contacts_owner_id_idx").on(table.ownerId),
     check(
       "contacts_contact_frequency_check",
       sql`${table.contactFrequency} in ('week', 'month', 'quarter', 'year')`,
@@ -89,6 +197,9 @@ export const groups = pgTable(
   "groups",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => users.id),
     // Stored as typed; uniqueness ignores case (see the index below)
     name: text("name").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -96,8 +207,13 @@ export const groups = pgTable(
       .defaultNow(),
   },
   (table) => [
-    // "Теннис" and "теннис" are the same group, even for concurrent requests
-    uniqueIndex("groups_name_lower_idx").on(sql`lower(${table.name})`),
+    index("groups_owner_id_idx").on(table.ownerId),
+    // "Теннис" and "теннис" are the same group of one user, even for
+    // concurrent requests; different users may have the same group name
+    uniqueIndex("groups_owner_id_name_lower_idx").on(
+      table.ownerId,
+      sql`lower(${table.name})`,
+    ),
     check(
       "groups_name_check",
       sql`char_length(btrim(${table.name})) between 1 and 50`,
@@ -122,6 +238,7 @@ export const contactGroups = pgTable(
   ],
 );
 
+export type User = typeof users.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type NewContact = typeof contacts.$inferInsert;
 export type Note = typeof notes.$inferSelect;

@@ -13,3 +13,14 @@ export function parseGroupParam(
   const id = Number(raw);
   return id > 0 && id <= MAX_INT ? id : null;
 }
+
+// The group chosen by ?group= among the groups of the signed-in user. The id
+// of someone else's group, a deleted group and a broken value all give
+// undefined, which means "Все группы"
+export function findSelectedGroup<T extends { id: number }>(
+  groups: T[],
+  param: string | string[] | undefined,
+): T | undefined {
+  const id = parseGroupParam(param);
+  return groups.find((group) => group.id === id);
+}
