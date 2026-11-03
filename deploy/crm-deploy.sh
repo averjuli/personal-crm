@@ -115,7 +115,7 @@ deploy() {
   # First step: nothing is touched yet, so a failed backup stops the deploy and the old version keeps running
   if docker volume inspect "$DB_VOLUME" >/dev/null 2>&1; then
     step "Backing up the database (version running now: ${current:-none})"
-    compose up -d --wait db
+    compose up -d --wait db </dev/null
     backup || die "backup failed: $version was not started, ${current:-nothing} keeps running"
   else
     step "No database yet, nothing to back up"
@@ -176,7 +176,8 @@ backup() {
   file="$BACKUP_DIR/$prefix-$(date +%Y%m%d-%H%M%S)-${version:0:12}"
   [ -n "$version" ] && file="$file.sql.gz" || file="${file}none.sql.gz"
   # $POSTGRES_* expand inside the container, so the password never shows up here
-  if ! compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | (umask 077 && gzip > "$file"); then
+  # </dev/null: docker would otherwise swallow the registry credentials waiting on this script's stdin
+  if ! compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' </dev/null | (umask 077 && gzip > "$file"); then
     rm -f "$file"
     echo "ERROR: backup failed" >&2
     return 1
