@@ -5,13 +5,16 @@
 # `sudo -n /usr/local/sbin/crm-deploy $SSH_ORIGINAL_COMMAND`.
 #
 #   crm-deploy upload        read a tar.gz of the repo's deploy/ from stdin and install it
-#   crm-deploy deploy <sha>  pull the image of that commit, apply migrations in a one-off container,
-#                            start the new version, smoke-test /health; when the image is not on
-#                            the server yet, registry user and token come on stdin, one per line
+#   crm-deploy deploy <sha>  back up the database, pull the image of that commit, apply migrations in
+#                            a one-off container, start the new version, smoke-test /health; when the
+#                            image is not on the server yet, registry user and token come on stdin,
+#                            one per line
 #   crm-deploy rollback      start the previous version again; manual only, never automatic
 #   crm-deploy status        containers, current and previous versions, health
 #   crm-deploy logs          last 200 lines of the app log
 #   crm-deploy backup        dump the database to /var/backups/personal-crm
+#   crm-deploy restore [file]  replace the database with a backup, in a terminal, after typing "yes";
+#                            without a file name it lists the backups; manual only
 #   crm-deploy seed          fill an empty database with test contacts
 set -euo pipefail
 
@@ -20,6 +23,10 @@ IMAGE_REPO=ghcr.io/averjuli/personal-crm
 APP_HOST=app.vupsen.space
 SMOKE_URL="https://$APP_HOST/health"
 BACKUP_DIR=/var/backups/personal-crm
+# Regular backups (one per deploy) kept on the server; copies made before a restore are never removed
+KEEP_BACKUPS=10
+DB_VOLUME=prod_db-data
+LAST_BACKUP=""
 
 step() { echo "==> $*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -103,10 +110,19 @@ deploy() {
   [ -s "$APP_DIR/.env" ] || die "$APP_DIR/.env is missing or empty"
   local image="$IMAGE_REPO:$version" current started=0
   current=$(current_version)
+  export APP_TAG=$version
+
+  # First step: nothing is touched yet, so a failed backup stops the deploy and the old version keeps running
+  if docker volume inspect "$DB_VOLUME" >/dev/null 2>&1; then
+    step "Backing up the database (version running now: ${current:-none})"
+    compose up -d --wait db
+    backup || die "backup failed: $version was not started, ${current:-nothing} keeps running"
+  else
+    step "No database yet, nothing to back up"
+  fi
 
   docker image inspect "$image" >/dev/null 2>&1 || pull "$image"
   [ "$(image_version "$image")" = "$version" ] || die "$image was built from another commit"
-  export APP_TAG=$version
 
   step "Starting the database"
   compose up -d --wait db
@@ -152,16 +168,87 @@ status() {
   echo "health:   $(curl -fsS --max-time 5 http://127.0.0.1:3000/health || echo unavailable)"
 }
 
+# Name: <prefix>-<date>-<time>-<version running now>.sql.gz; the path goes to LAST_BACKUP
 backup() {
+  local prefix=${1:-prod} version file
+  version=$(current_version)
   install -d -m 700 "$BACKUP_DIR"
-  local file
-  file="$BACKUP_DIR/prod-$(date +%Y%m%d-%H%M%S).sql.gz"
+  file="$BACKUP_DIR/$prefix-$(date +%Y%m%d-%H%M%S)-${version:0:12}"
+  [ -n "$version" ] && file="$file.sql.gz" || file="${file}none.sql.gz"
   # $POSTGRES_* expand inside the container, so the password never shows up here
   if ! compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | (umask 077 && gzip > "$file"); then
     rm -f "$file"
-    die "backup failed"
+    echo "ERROR: backup failed" >&2
+    return 1
   fi
+  LAST_BACKUP=$file
   echo "$file ($(du -h "$file" | cut -f1))"
+  if [ "$prefix" = prod ]; then prune_backups; fi
+}
+
+# Keep the newest KEEP_BACKUPS regular backups; the names sort by date
+prune_backups() {
+  local files excess
+  mapfile -t files < <(ls -1 "$BACKUP_DIR"/prod-*.sql.gz | sort)
+  excess=$((${#files[@]} - KEEP_BACKUPS))
+  if [ "$excess" -gt 0 ]; then
+    rm -f -- "${files[@]:0:excess}"
+    echo "removed $excess old backup(s), kept $KEEP_BACKUPS"
+  fi
+}
+
+# Empty the database and load a backup into it (psql runs inside the db container)
+reload_database() {
+  local file=$1
+  compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -q -c "DROP DATABASE \"$POSTGRES_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$POSTGRES_DB\""' </dev/null \
+    && gunzip -c "$file" | compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 --single-transaction -q -o /dev/null'
+}
+
+# Manual only: replaces the whole database with a backup and starts the same app version again
+restore() {
+  local name=${1:-} file version db backup_version=unknown answer
+  if [ -z "$name" ]; then
+    echo "usage: ssh -t crm sudo crm-deploy restore <backup file name>"
+    echo "backups in $BACKUP_DIR (the name has the date, the time and the app version before the deploy):"
+    ls -1 "$BACKUP_DIR" 2>/dev/null || true
+    return 0
+  fi
+  [[ $name =~ ^[A-Za-z0-9._-]+\.sql\.gz$ ]] || die "give a backup file name from $BACKUP_DIR, without a path"
+  file="$BACKUP_DIR/$name"
+  [ -f "$file" ] || die "$file does not exist"
+  gzip -t "$file" || die "$file is damaged, nothing changed"
+  [ -t 0 ] || die "restore asks for a confirmation, run it in a terminal: ssh -t crm sudo crm-deploy restore $name"
+  version=$(current_version)
+  [ -n "$version" ] || die "no current version is recorded, there is nothing to start after the restore"
+  docker image inspect "$IMAGE_REPO:$version" >/dev/null 2>&1 || die "the image of the current version $version is not on the server"
+  [[ $name =~ -([0-9a-f]{12}|none)\.sql\.gz$ ]] && backup_version=${BASH_REMATCH[1]}
+
+  compose up -d --wait db
+  db=$(compose exec -T db sh -c 'printf %s "$POSTGRES_DB"' </dev/null)
+  echo "The database \"$db\" on this server will be DELETED and created again from:"
+  echo "  $file"
+  echo "  (made while the app was at version $backup_version)"
+  echo "The app will be stopped, then started again at its current version $version."
+  echo "A copy of the current database is saved first."
+  printf 'Type yes to continue: '
+  IFS= read -r answer || answer=""
+  [ "$answer" = yes ] || die "cancelled, nothing changed"
+
+  step "Saving a copy of the current database"
+  backup pre-restore || die "could not save a copy of the current database, nothing changed"
+  local copy=$LAST_BACKUP
+
+  step "Stopping the app"
+  compose stop app
+  step "Creating database $db again from $name"
+  reload_database "$file" || die "restore failed, the app is stopped and the database may be empty or half loaded. Copy made before the restore: $copy. To return to it: ssh -t crm sudo crm-deploy restore ${copy##*/}"
+
+  step "Starting $version"
+  compose up -d --no-deps --wait --wait-timeout 120 app \
+    || die "$version did not become healthy after the restore. The database is restored; copy made before the restore: $copy"
+  step "Smoke test"
+  smoke "$version" || die "smoke test failed after the restore, the database is restored; copy made before the restore: $copy"
+  step "Restored from $name, the app runs at $version"
 }
 
 [ "$(id -u)" -eq 0 ] || die "run through sudo: sudo crm-deploy ${1:-}"
@@ -178,6 +265,7 @@ case "${1:-}" in
   status) status ;;
   logs) compose logs --tail 200 app ;;
   backup) backup ;;
+  restore) restore "${2:-}" ;;
   seed) compose run --rm app node scripts/seed.mjs ;;
-  *) die "usage: crm-deploy upload | deploy <sha> | rollback | status | logs | backup | seed" ;;
+  *) die "usage: crm-deploy upload | deploy <sha> | rollback | status | logs | backup | restore [file] | seed" ;;
 esac
