@@ -6,7 +6,12 @@ import { ContactsTable } from "@/components/contacts-table";
 import { OverdueContacts } from "@/components/overdue-contacts";
 import { StatusPill } from "@/components/status-pill";
 import { buttonVariants } from "@/components/ui/button";
-import { listContacts, listGroups, listOverdueContacts } from "@/lib/contacts";
+import {
+  hasContacts,
+  listContacts,
+  listGroups,
+  listOverdueContacts,
+} from "@/lib/contacts";
 import { findSelectedGroup } from "@/lib/group-filter";
 import { requireUserId } from "@/lib/session";
 
@@ -57,9 +62,10 @@ async function ContactsSection({
   const groupId = selectedGroup?.id ?? null;
   // The "time to reach out" block is hidden while searching and is not
   // filtered by group
-  const [contacts, overdue] = await Promise.all([
+  const [contacts, overdue, anyContacts] = await Promise.all([
     listContacts(ownerId, search, groupId),
     search ? null : listOverdueContacts(ownerId),
+    hasContacts(ownerId),
   ]);
 
   return (
@@ -67,7 +73,8 @@ async function ContactsSection({
       {deleted === "1" && (
         <StatusPill role="status">Контакт удалён.</StatusPill>
       )}
-      {overdue && <OverdueContacts contacts={overdue} />}
+      {/* Someone without a single contact has nobody to keep in touch with */}
+      {overdue && anyContacts && <OverdueContacts contacts={overdue} />}
       {/* key resets the controls when the query changes, e.g. after "Сбросить" */}
       <ContactSearch
         key={`${search}|${groupId}`}

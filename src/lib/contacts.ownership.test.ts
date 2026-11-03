@@ -13,6 +13,7 @@ import {
   deleteGroup,
   deleteNote,
   getContact,
+  hasContacts,
   listContacts,
   listGroups,
   listNotes,
@@ -249,5 +250,19 @@ describe("B cannot read or change records of A", () => {
     const id = await createContact(b, input("Глеб", [theirs.id, mine.id]));
 
     expect((await getContact(b, id))!.groupIds).toEqual([mine.id]);
+  });
+});
+
+describe("new user", () => {
+  it("«Первый вход»: has no contacts, and contacts of others do not count", async () => {
+    expect(await hasContacts(a)).toBe(false);
+
+    await createContact(b, input("Глеб Орлов"));
+
+    expect(await hasContacts(a)).toBe(false);
+    expect(await hasContacts(b)).toBe(true);
+    expect(await listContacts(a, "", null)).toEqual([]);
+    expect(await listGroups(a)).toEqual([]);
+    expect(await listOverdueContacts(a)).toEqual([]);
   });
 });

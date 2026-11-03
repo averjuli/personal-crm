@@ -1,5 +1,6 @@
 // «Группы» page: the row buttons stay in one place whatever the name length
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const shortName = "Англ";
 const longName = "Одноклассники из школы № 57 и их родители";

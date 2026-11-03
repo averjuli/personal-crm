@@ -1,6 +1,7 @@
 // Main user paths of openspec/specs/contact-groups/spec.md. The rules behind
 // them are checked in src/lib/contacts.groups.test.ts
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";

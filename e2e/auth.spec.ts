@@ -1,6 +1,7 @@
 // Main user paths of openspec/changes/login/specs/user-auth (and the first sign-in
 // of data-ownership). The rules behind them are checked in src/lib/auth.test.ts
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, newBrowserContext, test } from "./fixtures";
 import postgres from "postgres";
 
 import { e2eDatabaseUrl } from "./database";
@@ -21,7 +22,7 @@ const sentMessage = (page: Page, email: string) =>
   page.getByText(`Ссылка для входа отправлена на ${email}`);
 
 const loginForm = (page: Page) => ({
-  field: page.getByLabel("Почта"),
+  field: page.getByRole("textbox", { name: "Почта" }),
   button: page.getByRole("button", { name: "Получить ссылку" }),
 });
 
@@ -154,7 +155,7 @@ test.describe("without sign-in", () => {
     await page.goto(link);
     await expect(page.getByRole("button", { name: "Выйти" })).toBeVisible();
 
-    const other = await browser.newContext({ baseURL, locale: "ru-RU" });
+    const other = await newBrowserContext(browser, baseURL);
     const otherPage = await other.newPage();
     await otherPage.goto(link);
 
@@ -212,12 +213,17 @@ test.describe("without sign-in", () => {
   test("«Неверный адрес в форме»: an error under the field, no email", async ({
     page,
   }) => {
+    const before = await withDatabase(
+      (sql) => sql`select 1 from sign_in_emails`,
+    );
     await requestLink(page, "anna@");
 
     await expect(page.getByText("Проверь адрес почты")).toBeVisible();
     await expect(page.getByText(/Ссылка для входа отправлена/)).toHaveCount(0);
-    const rows = await withDatabase((sql) => sql`select 1 from sign_in_emails`);
-    expect(rows.length).toBe(0);
+    const after = await withDatabase(
+      (sql) => sql`select 1 from sign_in_emails`,
+    );
+    expect(after.length).toBe(before.length);
   });
 
   test("«Пустое поле»: nothing and spaces only", async ({ page }) => {

@@ -127,6 +127,17 @@ export async function listContacts(
   );
 }
 
+// Whether the owner has at least one contact (the «Пора связаться» block is
+// not shown to someone who has none)
+export async function hasContacts(ownerId: string) {
+  const [found] = await db
+    .select({ id: contacts.id })
+    .from(contacts)
+    .where(eq(contacts.ownerId, ownerId))
+    .limit(1);
+  return found !== undefined;
+}
+
 // Contacts whose due day has come, the most overdue first
 export async function listOverdueContacts(ownerId: string) {
   return db

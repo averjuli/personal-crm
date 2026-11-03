@@ -1,7 +1,8 @@
 // Success criterion of openspec/changes/login: two users in two separate
 // browsers each add a contact and never see the contact of the other, neither
 // in the list, nor in the search, nor by a direct link
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { type Browser, type Page } from "@playwright/test";
+import { expect, newBrowserContext, test } from "./fixtures";
 
 import { uniqueEmail } from "./mailpit";
 import { signIn } from "./sign-in";
@@ -19,7 +20,7 @@ async function openBrowserOf(
   baseURL: string | undefined,
   email: string,
 ) {
-  const context = await browser.newContext({ baseURL, locale: "ru-RU" });
+  const context = await newBrowserContext(browser, baseURL);
   const page = await context.newPage();
   await signIn(page, email);
   return { context, page };

@@ -6,7 +6,7 @@ import { openMailbox } from "./mailpit";
 // Types the address in the form and presses «Получить ссылку»
 export async function requestLink(page: Page, typed: string) {
   await page.goto("/login");
-  await page.getByLabel("Почта").fill(typed);
+  await page.getByRole("textbox", { name: "Почта" }).fill(typed);
   await page.getByRole("button", { name: "Получить ссылку" }).click();
 }
 

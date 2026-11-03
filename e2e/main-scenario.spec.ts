@@ -1,5 +1,5 @@
 // Main scenario and its success criteria from specs/01-продуктовая-идея.md
-import { expect, test } from "@playwright/test";
+import { expect, newBrowserContext, test } from "./fixtures";
 
 import { existingContacts } from "./global-setup";
 import { signIn } from "./sign-in";
@@ -89,10 +89,7 @@ test("list, add a contact, find it by name, add a note; another browser sees the
 
   await test.step("Opened the same address in another browser: the same contacts", async () => {
     // A separate context shares no cookies, storage or cache with the first one
-    const otherContext = await browser.newContext({
-      baseURL,
-      locale: "ru-RU",
-    });
+    const otherContext = await newBrowserContext(browser, baseURL);
     const otherPage = await otherContext.newPage();
     const otherTable = otherPage.getByRole("table");
 
