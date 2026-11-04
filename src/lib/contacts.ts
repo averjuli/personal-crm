@@ -66,16 +66,25 @@ function overdueDays() {
 // Names of the contact's groups in alphabetical order (ICU collation, as for
 // contact names); an empty array for a contact without groups. Written by
 // hand for the same reason as lastContactOn
+// (a link to a group of another owner would not show up; there are none)
 const groupNames = sql<string[]>`coalesce((
   select array_agg(g.name order by g.name collate "ru-x-icu")
   from contact_groups cg
   join groups g on g.id = cg.group_id
-  where cg.contact_id = contacts.id
+  where cg.contact_id = contacts.id and g.owner_id = contacts.owner_id
 ), '{}')`;
+
+// Every function below takes the id of the signed-in user first and touches
+// only his records. A record of someone else looks like one that does not
+// exist: the same false / undefined / null / "not-found" as for a wrong id
 
 // The search matches a name or a group name; the group filter narrows the
 // result further. Either part may be absent
-export async function listContacts(search: string, groupId: number | null) {
+export async function listContacts(
+  ownerId: string,
+  search: string,
+  groupId: number | null,
+) {
   const pattern = `%${escapeLike(search)}%`;
   return (
     db
@@ -91,20 +100,24 @@ export async function listContacts(search: string, groupId: number | null) {
       .from(contacts)
       .where(
         and(
+          eq(contacts.ownerId, ownerId),
           search
             ? or(
                 ilike(contacts.name, pattern),
                 sql`exists (
                 select 1 from contact_groups cg
                 join groups g on g.id = cg.group_id
-                where cg.contact_id = contacts.id and g.name ilike ${pattern}
+                where cg.contact_id = contacts.id
+                  and g.owner_id = ${ownerId} and g.name ilike ${pattern}
               )`,
               )
             : undefined,
           groupId !== null
             ? sql`exists (
               select 1 from contact_groups cg
+              join groups g on g.id = cg.group_id
               where cg.contact_id = contacts.id and cg.group_id = ${groupId}
+                and g.owner_id = ${ownerId}
             )`
             : undefined,
         ),
@@ -114,8 +127,19 @@ export async function listContacts(search: string, groupId: number | null) {
   );
 }
 
+// Whether the owner has at least one contact (the «Пора связаться» block is
+// not shown to someone who has none)
+export async function hasContacts(ownerId: string) {
+  const [found] = await db
+    .select({ id: contacts.id })
+    .from(contacts)
+    .where(eq(contacts.ownerId, ownerId))
+    .limit(1);
+  return found !== undefined;
+}
+
 // Contacts whose due day has come, the most overdue first
-export async function listOverdueContacts() {
+export async function listOverdueContacts(ownerId: string) {
   return db
     .select({
       id: contacts.id,
@@ -125,7 +149,11 @@ export async function listOverdueContacts() {
     })
     .from(contacts)
     .where(
-      and(isNotNull(contacts.contactFrequency), sql`${dueOn} <= ${today()}`),
+      and(
+        eq(contacts.ownerId, ownerId),
+        isNotNull(contacts.contactFrequency),
+        sql`${dueOn} <= ${today()}`,
+      ),
     )
     .orderBy(
       asc(dueOn),
@@ -134,7 +162,7 @@ export async function listOverdueContacts() {
     );
 }
 
-export async function getContact(id: number) {
+export async function getContact(ownerId: string, id: number) {
   const [contact] = await db
     .select({
       id: contacts.id,
@@ -149,7 +177,7 @@ export async function getContact(id: number) {
       overdueDays: overdueDays(),
     })
     .from(contacts)
-    .where(eq(contacts.id, id))
+    .where(and(eq(contacts.id, id), eq(contacts.ownerId, ownerId)))
     .limit(1);
   if (!contact) {
     return undefined;
@@ -157,11 +185,12 @@ export async function getContact(id: number) {
   const memberships = await db
     .select({ groupId: contactGroups.groupId })
     .from(contactGroups)
-    .where(eq(contactGroups.contactId, id));
+    .innerJoin(groups, eq(groups.id, contactGroups.groupId))
+    .where(and(eq(contactGroups.contactId, id), eq(groups.ownerId, ownerId)));
   return { ...contact, groupIds: memberships.map((row) => row.groupId) };
 }
 
-export async function listNotes(contactId: number) {
+export async function listNotes(ownerId: string, contactId: number) {
   return db
     .select({
       id: notes.id,
@@ -169,18 +198,20 @@ export async function listNotes(contactId: number) {
       notedOn: notes.notedOn,
     })
     .from(notes)
-    .where(eq(notes.contactId, contactId))
+    .innerJoin(contacts, eq(contacts.id, notes.contactId))
+    .where(and(eq(notes.contactId, contactId), eq(contacts.ownerId, ownerId)))
     .orderBy(desc(notes.notedOn), desc(notes.id));
 }
 
 // The first note and the contact are saved together or not at all
-export async function createContact(input: ContactInput) {
+export async function createContact(ownerId: string, input: ContactInput) {
   const { frequency, note, groupIds, ...fields } = input;
   return db.transaction(async (tx) => {
     const [created] = await tx
       .insert(contacts)
       .values({
         ...fields,
+        ownerId,
         contactFrequency: frequency,
         frequencySetOn: frequency ? today() : null,
       })
@@ -190,13 +221,14 @@ export async function createContact(input: ContactInput) {
         .insert(notes)
         .values({ contactId: created.id, body: note, notedOn: today() });
     }
-    await setContactGroups(tx, created.id, groupIds);
+    await setContactGroups(tx, ownerId, created.id, groupIds);
     return created.id;
   });
 }
 
 // Returns false when the contact does not exist
 export async function updateContact(
+  ownerId: string,
   id: number,
   input: Omit<ContactInput, "note">,
 ) {
@@ -220,12 +252,12 @@ export async function updateContact(
         skippedOn: sql`case when ${frequency}::text is null then null else ${contacts.skippedOn} end`,
         updatedAt: new Date(),
       })
-      .where(eq(contacts.id, id))
+      .where(and(eq(contacts.id, id), eq(contacts.ownerId, ownerId)))
       .returning({ id: contacts.id });
     if (updated.length === 0) {
       return false;
     }
-    await setContactGroups(tx, id, groupIds);
+    await setContactGroups(tx, ownerId, id, groupIds);
     return true;
   });
 }
@@ -233,9 +265,11 @@ export async function updateContact(
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // Makes the contact's groups exactly the given ones. Ids of groups deleted in
-// the meantime are skipped instead of failing the whole save
+// the meantime are skipped instead of failing the whole save, and so are ids
+// of groups of another owner: a contact is never put into someone else's group
 async function setContactGroups(
   tx: Transaction,
+  ownerId: string,
   contactId: number,
   groupIds: number[],
 ) {
@@ -244,7 +278,7 @@ async function setContactGroups(
         await tx
           .select({ id: groups.id })
           .from(groups)
-          .where(inArray(groups.id, groupIds))
+          .where(and(inArray(groups.id, groupIds), eq(groups.ownerId, ownerId)))
       ).map((row) => row.id)
     : [];
   await tx
@@ -266,21 +300,34 @@ async function setContactGroups(
 }
 
 // Returns false when the contact does not exist
-export async function deleteContact(id: number) {
+export async function deleteContact(ownerId: string, id: number) {
   const deleted = await db
     .delete(contacts)
-    .where(eq(contacts.id, id))
+    .where(and(eq(contacts.id, id), eq(contacts.ownerId, ownerId)))
     .returning({ id: contacts.id });
   return deleted.length > 0;
 }
 
+// The contacts of the owner, for the queries about notes: a note belongs to
+// the owner of its contact
+function contactsOf(ownerId: string) {
+  return db
+    .select({ id: contacts.id })
+    .from(contacts)
+    .where(eq(contacts.ownerId, ownerId));
+}
+
 // Returns false when the contact does not exist
-export async function addNote(contactId: number, input: NoteInput) {
+export async function addNote(
+  ownerId: string,
+  contactId: number,
+  input: NoteInput,
+) {
   return db.transaction(async (tx) => {
     const [contact] = await tx
       .select({ id: contacts.id })
       .from(contacts)
-      .where(eq(contacts.id, contactId))
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, ownerId)))
       .for("share");
     if (!contact) {
       return false;
@@ -291,28 +338,32 @@ export async function addNote(contactId: number, input: NoteInput) {
 }
 
 // Returns false when the note does not exist
-export async function updateNote(id: number, input: NoteInput) {
+export async function updateNote(
+  ownerId: string,
+  id: number,
+  input: NoteInput,
+) {
   const updated = await db
     .update(notes)
     .set({ ...input, updatedAt: new Date() })
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), inArray(notes.contactId, contactsOf(ownerId))))
     .returning({ id: notes.id });
   return updated.length > 0;
 }
 
 // Returns false when the note does not exist
-export async function deleteNote(id: number) {
+export async function deleteNote(ownerId: string, id: number) {
   const deleted = await db
     .delete(notes)
-    .where(eq(notes.id, id))
+    .where(and(eq(notes.id, id), inArray(notes.contactId, contactsOf(ownerId))))
     .returning({ id: notes.id });
   return deleted.length > 0;
 }
 
 export type GroupListItem = Awaited<ReturnType<typeof listGroups>>[number];
 
-// All groups alphabetically, each with the number of its contacts
-export async function listGroups() {
+// All groups of the owner alphabetically, each with the number of its contacts
+export async function listGroups(ownerId: string) {
   return db
     .select({
       id: groups.id,
@@ -321,6 +372,7 @@ export async function listGroups() {
     })
     .from(groups)
     .leftJoin(contactGroups, eq(contactGroups.groupId, groups.id))
+    .where(eq(groups.ownerId, ownerId))
     .groupBy(groups.id)
     .orderBy(sql`${groups.name} collate "ru-x-icu"`, asc(groups.id));
 }
@@ -331,12 +383,13 @@ function isUniqueViolation(error: unknown) {
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
-// Creates the group, or returns the existing one with the same name ignoring
-// case. Never fails on a duplicate, even when two requests race
-export async function createGroup(name: string) {
+// Creates the group, or returns the existing one of the owner with the same
+// name ignoring case (another owner's group does not count). Never fails on a
+// duplicate, even when two requests race
+export async function createGroup(ownerId: string, name: string) {
   const [created] = await db
     .insert(groups)
-    .values({ name })
+    .values({ ownerId, name })
     .onConflictDoNothing()
     .returning({ id: groups.id, name: groups.name });
   if (created) {
@@ -345,7 +398,12 @@ export async function createGroup(name: string) {
   const [existing] = await db
     .select({ id: groups.id, name: groups.name })
     .from(groups)
-    .where(sql`lower(${groups.name}) = lower(${name})`)
+    .where(
+      and(
+        eq(groups.ownerId, ownerId),
+        sql`lower(${groups.name}) = lower(${name})`,
+      ),
+    )
     .limit(1);
   if (!existing) {
     throw new Error("The group was deleted while it was being created");
@@ -357,6 +415,7 @@ export type RenameGroupResult = "renamed" | "not-found" | "taken";
 
 // A case-only change passes: the unique index compares the row with itself
 export async function renameGroup(
+  ownerId: string,
   id: number,
   name: string,
 ): Promise<RenameGroupResult> {
@@ -364,7 +423,7 @@ export async function renameGroup(
     const updated = await db
       .update(groups)
       .set({ name })
-      .where(eq(groups.id, id))
+      .where(and(eq(groups.id, id), eq(groups.ownerId, ownerId)))
       .returning({ id: groups.id });
     return updated.length > 0 ? "renamed" : "not-found";
   } catch (error) {
@@ -377,10 +436,10 @@ export async function renameGroup(
 
 // Contacts keep everything else; only their links to the group go away.
 // Returns false when the group does not exist
-export async function deleteGroup(id: number) {
+export async function deleteGroup(ownerId: string, id: number) {
   const deleted = await db
     .delete(groups)
-    .where(eq(groups.id, id))
+    .where(and(eq(groups.id, id), eq(groups.ownerId, ownerId)))
     .returning({ id: groups.id });
   return deleted.length > 0;
 }
@@ -401,6 +460,7 @@ const keepInTouchColumns = {
 // Marks today as "Already contacted" or "Skip this time". Returns null when
 // the contact does not exist (or, for a skip, has no frequency)
 export async function markKeepInTouch(
+  ownerId: string,
   id: number,
   kind: KeepInTouchKind,
 ): Promise<KeepInTouchChange | null> {
@@ -413,6 +473,7 @@ export async function markKeepInTouch(
       .where(
         and(
           eq(contacts.id, id),
+          eq(contacts.ownerId, ownerId),
           kind === "skipped" ? isNotNull(contacts.contactFrequency) : undefined,
         ),
       )
@@ -423,7 +484,7 @@ export async function markKeepInTouch(
     const [updated] = await tx
       .update(contacts)
       .set({ [field]: today() })
-      .where(eq(contacts.id, id))
+      .where(and(eq(contacts.id, id), eq(contacts.ownerId, ownerId)))
       .returning({ applied: column });
     return { previous: current.previous, applied: updated.applied! };
   });
@@ -432,6 +493,7 @@ export async function markKeepInTouch(
 // Restores the previous value only while the field still holds what the click
 // set, so an undo never erases a newer mark. Returns whether it restored
 export async function undoKeepInTouch(
+  ownerId: string,
   id: number,
   kind: KeepInTouchKind,
   change: KeepInTouchChange,
@@ -444,6 +506,7 @@ export async function undoKeepInTouch(
     .where(
       and(
         eq(contacts.id, id),
+        eq(contacts.ownerId, ownerId),
         sql`${column} is not distinct from ${change.applied}::date`,
       ),
     )

@@ -4,6 +4,7 @@ import { BackToList } from "@/components/back-to-list";
 import { GroupRow } from "@/components/group-row";
 import { NewGroupForm } from "@/components/new-group-form";
 import { listGroups } from "@/lib/contacts";
+import { requireUserId } from "@/lib/session";
 
 export default function GroupsPage() {
   return (
@@ -22,7 +23,8 @@ export default function GroupsPage() {
 }
 
 async function GroupsSection() {
-  const groups = await listGroups();
+  const ownerId = await requireUserId();
+  const groups = await listGroups(ownerId);
   return (
     <div className="grid gap-4">
       <NewGroupForm />

@@ -80,8 +80,24 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Catches the sign-in emails of the tests (localhost:1025, the tests read
+      # them on localhost:8025). Same image as compose.yaml
+      mailpit:
+        image: axllent/mailpit:v1.33.0
+        env:
+          # Without it the SMTP greeting comes ~8 seconds late
+          MP_SMTP_DISABLE_RDNS: "true"
+        ports:
+          - 1025:1025
+          - 8025:8025
+        options: >-
+          --health-cmd "/mailpit readyz"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      # Throwaway CI database, not a secret; the tests create crm_e2e next to it
+      # Throwaway CI database, not a secret; the tests create crm_e2e next to it.
+      # Sign-in settings of the app under test are in playwright.config.ts
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm
     steps:
       - uses: actions/checkout@v7

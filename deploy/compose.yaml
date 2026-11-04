@@ -1,6 +1,7 @@
 # Production on the server: the app and its own PostgreSQL, compose project "prod".
 # Every deploy copies deploy/ to /opt/personal-crm/deploy; run it only through crm-deploy,
-# which sets APP_TAG. Secrets come from /opt/personal-crm/.env (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB).
+# which sets APP_TAG. Secrets come from /opt/personal-crm/.env (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB,
+# BETTER_AUTH_SECRET, SMTP_URL, OWNER_EMAIL); a missing one stops the deploy at its first step.
 name: prod
 
 # Container logs: at most 3 files of 10 MB each
@@ -44,6 +45,15 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Sign-in. This service is also the one-off container of migrations and
+      # demo data (crm-deploy), so all of them get the same settings.
+      # Secrets and the owner: from .env
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      SMTP_URL: ${SMTP_URL:?set SMTP_URL in .env}
+      OWNER_EMAIL: ${OWNER_EMAIL:?set OWNER_EMAIL in .env}
+      # Not secret: the address of the app and the sender of the emails
+      BETTER_AUTH_URL: https://app.vupsen.space
+      MAIL_FROM: "Личная CRM <noreply@mail.crm.vupsen.space>"
     ports:
       # nginx proxies app.vupsen.space here
       - "127.0.0.1:3000:3000"

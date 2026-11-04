@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { BackToList } from "@/components/back-to-list";
 import { ContactForm } from "@/components/contact-form";
 import { listGroups } from "@/lib/contacts";
+import { requireUserId } from "@/lib/session";
 
 export default function NewContactPage() {
   return (
@@ -21,5 +22,6 @@ export default function NewContactPage() {
 }
 
 async function NewContactForm() {
-  return <ContactForm groups={await listGroups()} />;
+  const ownerId = await requireUserId();
+  return <ContactForm groups={await listGroups(ownerId)} />;
 }

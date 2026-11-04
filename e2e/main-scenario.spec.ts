@@ -1,7 +1,12 @@
 // Main scenario and its success criteria from specs/01-продуктовая-идея.md
-import { expect, test } from "@playwright/test";
+import { expect, newBrowserContext, test } from "./fixtures";
 
 import { existingContacts } from "./global-setup";
+import { signIn } from "./sign-in";
+import { e2eUser, signedOut } from "./test-user";
+
+// The scenario starts at the sign-in, not with a saved session
+test.use({ storageState: signedOut });
 
 const newContact = {
   name: "Вера Лебедева",
@@ -16,6 +21,10 @@ test("list, add a contact, find it by name, add a note; another browser sees the
 }) => {
   const table = page.getByRole("table");
   const notes = page.getByRole("region", { name: "Заметки" });
+
+  await test.step("Signed in by the link from the email", async () => {
+    await signIn(page, e2eUser.email);
+  });
 
   await test.step("Opened the app: the list shows every contact", async () => {
     await page.goto("/");
@@ -80,10 +89,12 @@ test("list, add a contact, find it by name, add a note; another browser sees the
 
   await test.step("Opened the same address in another browser: the same contacts", async () => {
     // A separate context shares no cookies, storage or cache with the first one
-    const otherContext = await browser.newContext({ baseURL });
+    const otherContext = await newBrowserContext(browser, baseURL);
     const otherPage = await otherContext.newPage();
     const otherTable = otherPage.getByRole("table");
 
+    // The same user signs in there with a link of its own
+    await signIn(otherPage, e2eUser.email);
     await otherPage.goto("/");
     await expect(
       otherPage.getByText(`Всего контактов: ${existingContacts.length + 1}`),

@@ -1,6 +1,7 @@
 // Main user paths of openspec/specs/contact-groups/spec.md. The rules behind
 // them are checked in src/lib/contacts.groups.test.ts
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -9,6 +10,7 @@ import { contactGroups, contacts, groups } from "@/db/schema";
 
 import { e2eDatabaseUrl } from "./database";
 import { resetDatabase } from "./global-setup";
+import { e2eUser } from "./test-user";
 
 async function withDatabase<T>(
   work: (db: ReturnType<typeof drizzle>) => Promise<T>,
@@ -34,7 +36,7 @@ async function putIntoGroup(groupName: string, contactNames: string[]) {
       (
         await db
           .insert(groups)
-          .values({ name: groupName })
+          .values({ name: groupName, ownerId: e2eUser.id })
           .returning({ id: groups.id })
       )[0];
     if (contactNames.length) {

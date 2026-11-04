@@ -1,6 +1,7 @@
 // Main user paths of openspec/specs/keep-in-touch/spec.md. The server runs on
 // the real clock, so the days here are counted back from the real today
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
@@ -9,6 +10,7 @@ import { formatDay, todayInAppTimeZone } from "@/lib/keep-in-touch";
 
 import { e2eDatabaseUrl } from "./database";
 import { resetDatabase } from "./global-setup";
+import { e2eUser } from "./test-user";
 
 const noteText = "Созвонились, обсудили отпуск";
 
@@ -25,7 +27,12 @@ async function addOverdueContact(name: string) {
     const db = drizzle(client);
     const [contact] = await db
       .insert(contacts)
-      .values({ name, contactFrequency: "week", frequencySetOn: daysAgo(30) })
+      .values({
+        ownerId: e2eUser.id,
+        name,
+        contactFrequency: "week",
+        frequencySetOn: daysAgo(30),
+      })
       .returning({ id: contacts.id });
     await db
       .insert(notes)

@@ -9,6 +9,7 @@ import {
   type AddGroupResult,
   type GroupFormState,
 } from "@/lib/group-form";
+import { requireUserId } from "@/lib/session";
 
 function assertId(id: number, what: string) {
   if (!Number.isSafeInteger(id) || id <= 0) {
@@ -24,12 +25,14 @@ function readName(formData: FormData) {
 // Called by the "Добавить" button in the contact form. A name that already
 // exists (any case) gives the existing group back
 export async function addGroupAction(name: string): Promise<AddGroupResult> {
+  // Every action starts with requireUserId(): no session, nothing runs
+  const ownerId = await requireUserId();
   const parsed = groupNameSchema.safeParse(name);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0].message };
   }
 
-  const group = await createGroup(parsed.data);
+  const group = await createGroup(ownerId, parsed.data);
 
   revalidatePath("/", "layout");
   return { ok: true, group };
@@ -53,6 +56,7 @@ export async function renameGroupAction(
   _prevState: GroupFormState,
   formData: FormData,
 ): Promise<GroupFormState> {
+  const ownerId = await requireUserId();
   assertId(id, "group");
 
   const value = readName(formData);
@@ -61,7 +65,7 @@ export async function renameGroupAction(
     return { status: "error", error: parsed.error.issues[0].message, value };
   }
 
-  const result = await renameGroup(id, parsed.data);
+  const result = await renameGroup(ownerId, id, parsed.data);
   if (result === "taken") {
     return { status: "error", error: GROUP_TAKEN_MESSAGE, value };
   }
@@ -74,10 +78,11 @@ export async function renameGroupAction(
 }
 
 export async function deleteGroupAction(id: number) {
+  const ownerId = await requireUserId();
   assertId(id, "group");
 
   // A group already deleted elsewhere ends the same way: it is gone
-  await deleteGroup(id);
+  await deleteGroup(ownerId, id);
 
   revalidatePath("/", "layout");
 }

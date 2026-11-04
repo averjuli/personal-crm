@@ -17,6 +17,10 @@ import {
   type KeepInTouchKind,
 } from "@/lib/contacts";
 import { parseNoteForm, type NoteFormState } from "@/lib/note-form";
+import { requireUserId } from "@/lib/session";
+
+// Every action starts with requireUserId(): without a session nothing below
+// runs, and the owner it returns goes to every data function
 
 function assertId(id: number, what: string) {
   if (!Number.isSafeInteger(id) || id <= 0) {
@@ -28,12 +32,13 @@ export async function createContactAction(
   _prevState: ContactFormState,
   formData: FormData,
 ): Promise<ContactFormState> {
+  const ownerId = await requireUserId();
   const parsed = parseContactForm(formData);
   if (!parsed.success) {
     return parsed.state;
   }
 
-  const id = await createContact(parsed.data);
+  const id = await createContact(ownerId, parsed.data);
 
   revalidatePath("/", "layout");
   redirect(`/contacts/${id}?created=1`);
@@ -44,6 +49,7 @@ export async function updateContactAction(
   _prevState: ContactFormState,
   formData: FormData,
 ): Promise<ContactFormState> {
+  const ownerId = await requireUserId();
   assertId(id, "contact");
 
   const parsed = parseContactForm(formData);
@@ -51,7 +57,7 @@ export async function updateContactAction(
     return parsed.state;
   }
 
-  const found = await updateContact(id, parsed.data);
+  const found = await updateContact(ownerId, id, parsed.data);
   if (!found) {
     return {
       status: "error",
@@ -64,10 +70,11 @@ export async function updateContactAction(
 }
 
 export async function deleteContactAction(id: number) {
+  const ownerId = await requireUserId();
   assertId(id, "contact");
 
   // A contact already deleted elsewhere ends the same way: it is gone
-  await deleteContact(id);
+  await deleteContact(ownerId, id);
 
   revalidatePath("/", "layout");
   // Replace the card in history, so "Back" does not lead to a deleted contact
@@ -79,6 +86,7 @@ export async function addNoteAction(
   _prevState: NoteFormState,
   formData: FormData,
 ): Promise<NoteFormState> {
+  const ownerId = await requireUserId();
   assertId(contactId, "contact");
 
   const parsed = parseNoteForm(formData);
@@ -86,7 +94,7 @@ export async function addNoteAction(
     return parsed.state;
   }
 
-  const found = await addNote(contactId, parsed.data);
+  const found = await addNote(ownerId, contactId, parsed.data);
   if (!found) {
     return { status: "error", message: "Этот контакт не найден" };
   }
@@ -100,6 +108,7 @@ export async function updateNoteAction(
   _prevState: NoteFormState,
   formData: FormData,
 ): Promise<NoteFormState> {
+  const ownerId = await requireUserId();
   assertId(noteId, "note");
 
   const parsed = parseNoteForm(formData);
@@ -107,7 +116,7 @@ export async function updateNoteAction(
     return parsed.state;
   }
 
-  const found = await updateNote(noteId, parsed.data);
+  const found = await updateNote(ownerId, noteId, parsed.data);
   if (!found) {
     return { status: "error", message: "Эта заметка не найдена" };
   }
@@ -117,10 +126,11 @@ export async function updateNoteAction(
 }
 
 export async function deleteNoteAction(noteId: number) {
+  const ownerId = await requireUserId();
   assertId(noteId, "note");
 
   // A note already deleted elsewhere ends the same way: it is gone
-  await deleteNote(noteId);
+  await deleteNote(ownerId, noteId);
 
   revalidatePath("/", "layout");
 }
@@ -132,9 +142,10 @@ async function markAction(
   contactId: number,
   kind: KeepInTouchKind,
 ): Promise<KeepInTouchResult> {
+  const ownerId = await requireUserId();
   assertId(contactId, "contact");
 
-  const change = await markKeepInTouch(contactId, kind);
+  const change = await markKeepInTouch(ownerId, contactId, kind);
   if (!change) {
     return { ok: false, message: "Этот контакт не найден" };
   }
@@ -160,6 +171,7 @@ export async function undoKeepInTouchAction(
   kind: KeepInTouchKind,
   change: KeepInTouchChange,
 ) {
+  const ownerId = await requireUserId();
   assertId(contactId, "contact");
   if (kind !== "contacted" && kind !== "skipped") {
     throw new Error(`Invalid kind: ${kind}`);
@@ -171,7 +183,7 @@ export async function undoKeepInTouchAction(
     throw new Error("Invalid day in undo request");
   }
 
-  await undoKeepInTouch(contactId, kind, change);
+  await undoKeepInTouch(ownerId, contactId, kind, change);
 
   revalidatePath("/", "layout");
 }
