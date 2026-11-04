@@ -142,6 +142,59 @@ test.describe("without sign-in", () => {
     await expectLoginPage(page);
   });
 
+  test("«Выход только на этом устройстве»: the other browser stays signed in", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    const email = uniqueEmail("anna");
+    await signIn(page, email);
+    const other = await newBrowserContext(browser, baseURL);
+    const otherPage = await other.newPage();
+    await signIn(otherPage, email);
+
+    await page.getByRole("button", { name: "Выйти" }).click();
+
+    await expectLoginPage(page);
+    await otherPage.goto("/");
+    await expect(otherPage).toHaveURL("/");
+    await expect(otherPage.getByText(email)).toBeVisible();
+    await expect(
+      otherPage.getByRole("button", { name: "Выйти" }),
+    ).toBeVisible();
+    await other.close();
+  });
+
+  test("«Не заходил больше 30 дней»: the browser still has the cookie, every page asks to sign in", async ({
+    page,
+  }) => {
+    const email = uniqueEmail("anna");
+    await signIn(page, email);
+    await expect(page.getByText("Добавь первый контакт")).toBeVisible();
+    // Time cannot be sped up in a real browser: the term of this user's
+    // session is moved in the database (the sessions of other users stay)
+    await withDatabase(
+      (sql) =>
+        sql`update sessions set expires_at = now() - interval '1 minute'
+          where user_id = (select id from users where email = ${email})`,
+    );
+
+    const cookies = await page.context().cookies();
+    expect(cookies.some((item) => item.name.includes("session_token"))).toBe(
+      true,
+    );
+
+    await page.goto("/");
+    await expectLoginPage(page);
+    await expect(page.getByText("Добавь первый контакт")).toHaveCount(0);
+
+    // The cookie is still there, yet the form is shown and nothing loops
+    await page.goto("/login");
+    await expectLoginPage(page);
+    await page.goto("/groups");
+    await expectLoginPage(page);
+  });
+
   test("«Ссылка открыта второй раз»: «Ссылка устарела», and the button leads to the form", async ({
     page,
     browser,
