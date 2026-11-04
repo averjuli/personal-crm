@@ -10,8 +10,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-# src/db requires DATABASE_URL at import; the build never connects, so a placeholder is enough
-RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm build
+# src/db requires DATABASE_URL at import and src/lib/auth.ts wants BETTER_AUTH_SECRET;
+# the build never connects or signs anyone in, so placeholders are enough. The real
+# values come from the environment of the running container and never enter the image
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build     BETTER_AUTH_SECRET=build-only-placeholder-build-only-placeholder     pnpm build
 # One file per script with all dependencies inlined, so the runtime image needs no node_modules for them
 RUN pnpm exec esbuild src/db/migrate.ts src/db/seed.ts \
       --bundle --platform=node --format=esm --target=node24 \
