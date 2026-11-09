@@ -3,6 +3,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
+import { toSafeDatabaseError } from "./safe-errors";
 import * as schema from "./schema";
 import { seedContacts } from "./seed-contacts";
 
@@ -28,6 +29,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Seed failed:", error);
+  console.error("Seed failed:", toSafeDatabaseError(error));
   process.exit(1);
 });
