@@ -15,6 +15,18 @@ services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    # Values of failed queries must not reach this log. Errors of queries go only
+    # to the log of the app; what stays here (start, stop, severe failures) has
+    # one line per event, without details and without the text of the query.
+    # Changing this recreates the container on the next deploy; the data stays
+    command:
+      - postgres
+      - -c
+      - log_min_messages=log
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_min_error_statement=panic
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
