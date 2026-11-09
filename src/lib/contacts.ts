@@ -377,10 +377,9 @@ export async function listGroups(ownerId: string) {
     .orderBy(sql`${groups.name} collate "ru-x-icu"`, asc(groups.id));
 }
 
-// Postgres error 23505; drizzle wraps the driver error, so look at its cause too
+// Postgres error 23505
 function isUniqueViolation(error: unknown) {
-  const e = error as { code?: string; cause?: { code?: string } } | null;
-  return e?.code === "23505" || e?.cause?.code === "23505";
+  return (error as { code?: string } | null)?.code === "23505";
 }
 
 // Creates the group, or returns the existing one of the owner with the same

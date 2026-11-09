@@ -4,6 +4,7 @@
 import postgres from "postgres";
 
 import { applyMigrations } from "./migrations";
+import { toSafeDatabaseError } from "./safe-errors";
 
 // How many migrations the history table (shared with drizzle-kit) lists
 async function appliedCount(client: postgres.Sql) {
@@ -38,6 +39,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("Migration failed:", error);
+  console.error("Migration failed:", toSafeDatabaseError(error));
   process.exit(1);
 });
