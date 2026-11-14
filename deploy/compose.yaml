@@ -1,19 +1,18 @@
-# Production on the server: the app and its own PostgreSQL, compose project "prod".
+# App and PostgreSQL for prod or staging; crm-deploy selects a project and env file.
 # Every deploy copies deploy/ to /opt/personal-crm/deploy; run it only through crm-deploy,
-# which sets APP_TAG. Secrets come from /opt/personal-crm/.env (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB,
-# BETTER_AUTH_SECRET, SMTP_URL, OWNER_EMAIL); a missing one stops the deploy at its first step.
+# which selects the environment file and sets APP_TAG. Staging uses its own /opt/personal-crm/staging/.env.
 name: prod
 
-# Container logs: at most 3 files of 10 MB each
+# Container logs are stored in the system journal and follow the server's journal retention limit.
 x-logging: &logging
-  driver: json-file
+  driver: journald
   options:
-    max-size: 10m
-    max-file: "3"
+    tag: personal-crm-{{.Name}}
 
 services:
   db:
     image: postgres:18-alpine
+    mem_limit: ${DB_MEMORY_LIMIT:-0}
     restart: unless-stopped
     # Values of failed queries must not reach this log. Errors of queries go only
     # to the log of the app; what stays here (start, stop, severe failures) has
@@ -50,6 +49,7 @@ services:
   app:
     # Built by GitHub Actions and tagged with the commit SHA; crm-deploy pulls it, compose never does
     image: ghcr.io/averjuli/personal-crm:${APP_TAG:?run through crm-deploy, it sets APP_TAG}
+    mem_limit: ${APP_MEMORY_LIMIT:-0}
     pull_policy: never
     restart: unless-stopped
     depends_on:
@@ -64,11 +64,11 @@ services:
       SMTP_URL: ${SMTP_URL:?set SMTP_URL in .env}
       OWNER_EMAIL: ${OWNER_EMAIL:?set OWNER_EMAIL in .env}
       # Not secret: the address of the app and the sender of the emails
-      BETTER_AUTH_URL: https://app.vupsen.space
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://app.vupsen.space}
       MAIL_FROM: "Личная CRM <noreply@mail.crm.vupsen.space>"
     ports:
       # nginx proxies app.vupsen.space here
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     healthcheck:
       test:
         ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]

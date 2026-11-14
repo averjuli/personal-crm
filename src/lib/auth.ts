@@ -72,6 +72,8 @@ export const auth = betterAuth({
     cookieCache: { enabled: false },
   },
   advanced: {
+    // Keep cookies host-only; never share a session across CRM subdomains.
+    crossSubDomainCookies: { enabled: false },
     // nginx sets X-Real-IP itself; X-Forwarded-For can be extended by a client
     ipAddress: { ipAddressHeaders: ["x-real-ip"] },
   },
