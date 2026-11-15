@@ -47,7 +47,7 @@ select_environment() {
       ENV_DIR=$APP_DIR/staging
       ENV_FILE=$ENV_DIR/.env
       APP_HOST=test-app.vupsen.space
-      APP_PORT=3001
+      APP_PORT=3002
       BACKUP_ENABLED=no
       ;;
     *) die "environment must be prod or staging" ;;
@@ -427,11 +427,11 @@ server {
         satisfy any;
         allow 127.0.0.1;
         deny all;
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3002;
         include snippets/personal-crm-staging-proxy.conf;
     }
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3002;
         include snippets/personal-crm-staging-proxy.conf;
     }
 }
