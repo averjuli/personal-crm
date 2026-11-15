@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_prod:
+        description: Deploy this SHA to production after staging succeeds
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -123,6 +129,7 @@ jobs:
 
   deploy-prod:
     needs: [upload-deploy-scripts, deploy-staging]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_prod }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
