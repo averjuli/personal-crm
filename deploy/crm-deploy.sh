@@ -12,7 +12,8 @@
 #   crm-deploy rollback <environment>  start the previous version again; manual only
 #   crm-deploy status <environment>    containers, current and previous versions, health
 #   crm-deploy logs <environment>      last 200 lines of the app log
-#   crm-deploy backup prod             dump the production database
+#   crm-deploy backup prod [daily]     dump the production database
+#   crm-deploy setup-backups           install and enable the daily backup timer
 #   crm-deploy restore prod [file]     replace the production database after typing "yes";
 #                            without a file name it lists the backups; manual only
 #   crm-deploy seed          fill an empty database with test contacts
@@ -21,7 +22,7 @@ set -euo pipefail
 APP_DIR=/opt/personal-crm
 IMAGE_REPO=ghcr.io/averjuli/personal-crm
 BACKUP_DIR=/var/backups/personal-crm
-# Regular backups (one per deploy) kept on the server; copies made before a restore are never removed
+# Keep daily and deployment backups separately; pre-restore copies are retained.
 KEEP_BACKUPS=7
 LAST_BACKUP=""
 DEPLOY_ENV=""
@@ -71,7 +72,10 @@ upload() {
   install -d -m 755 "$new"
   tar -xzf - -C "$new" --no-same-owner --no-same-permissions
   [ -f "$new/compose.yaml" ] && [ -f "$new/crm-deploy.sh" ] || die "compose.yaml or crm-deploy.sh is missing"
-  bash -n "$new/crm-deploy.sh" || die "crm-deploy.sh has syntax errors, nothing installed"
+  local script
+  for script in "$new"/*.sh; do
+    bash -n "$script" || die "$(basename "$script") has syntax errors, nothing installed"
+  done
 
   rm -rf "$APP_DIR/deploy.old"
   if [ -d "$APP_DIR/deploy" ]; then mv "$APP_DIR/deploy" "$APP_DIR/deploy.old"; fi
@@ -81,6 +85,21 @@ upload() {
   install -m 755 "$APP_DIR/deploy/crm-deploy.sh" /usr/local/sbin/crm-deploy.new
   mv /usr/local/sbin/crm-deploy.new /usr/local/sbin/crm-deploy
   step "Deploy scripts updated: $(cd "$APP_DIR/deploy" && echo *)"
+}
+
+setup_backups() {
+  local unit changed=no
+  for unit in personal-crm-backup.service personal-crm-backup.timer; do
+    [ -f "$APP_DIR/deploy/$unit" ] || die "$unit is missing from deploy/"
+    if ! cmp -s "$APP_DIR/deploy/$unit" "/etc/systemd/system/$unit"; then
+      install -m 644 "$APP_DIR/deploy/$unit" "/etc/systemd/system/$unit"
+      changed=yes
+    fi
+  done
+  if [ "$changed" = yes ]; then systemctl daemon-reload; fi
+  systemctl enable --now personal-crm-backup.timer
+  if [ "$changed" = yes ]; then systemctl restart personal-crm-backup.timer; fi
+  step "Daily production backup enabled at 03:00 Europe/Moscow"
 }
 
 # Pull with registry credentials from stdin (GitHub Actions sends its short-lived token);
@@ -113,9 +132,12 @@ smoke() {
   [ "$code" = 200 ] && [[ $response == *'"status":"ok"'* && $response == *"\"version\":\"$expected\""* ]]
 }
 
-# Keep only the current and the previous image of the app
+# Remove only this app's images older than two weeks, preserving rollback images.
 prune_images() {
   local current previous staging_current ref created cutoff
+  # A staging deploy can be pulling an older image. Wait until its version is recorded.
+  exec 7>/run/crm-deploy-staging.lock
+  flock -w 600 7 || die "staging is busy; old images were not removed"
   current=$(current_version)
   previous=$(previous_version)
   staging_current=$(cat "$APP_DIR/staging/current-version" 2>/dev/null || true)
@@ -124,7 +146,7 @@ prune_images() {
     case "$ref" in
       "$IMAGE_REPO:$current" | "$IMAGE_REPO:$previous" | "$IMAGE_REPO:$staging_current" | *"<none>") ;;
       *)
-        created=$(docker image inspect -f '{{.Created}}' "$ref" 2>/dev/null | head -c 19 || true)
+        created=$(docker image inspect -f '{{.Created}}' "$ref" 2>/dev/null || true)
         if [ -n "$created" ] && [ "$(date -d "$created" +%s)" -lt "$cutoff" ]; then
           if docker image rm "$ref" >/dev/null; then echo "removed $ref"; fi
         fi
@@ -132,12 +154,15 @@ prune_images() {
     esac
   done
   echo "kept prod: $current (current) ${previous:-none} (previous); staging: ${staging_current:-none}"
+  flock -u 7
+  exec 7>&-
 }
 
 deploy() {
   local environment=${1:-} version=${2:-}
   select_environment "$environment"
   [[ $version =~ ^[0-9a-f]{40}$ ]] || die "usage: crm-deploy deploy <prod|staging> <full commit SHA>"
+  echo "DEPLOY_SHA=$version"
   local image="$IMAGE_REPO:$version" current started=0
   current=$(current_version)
   export APP_TAG=$version
@@ -169,7 +194,7 @@ deploy() {
     step "Backing up the database (version running now: ${current:-none})"
     compose up -d --wait db </dev/null
     backup || die "backup failed: $version was not started, ${current:-nothing} keeps running"
-  else
+  elif [ "$BACKUP_ENABLED" = yes ]; then
     step "No database yet, nothing to back up"
   fi
 
@@ -202,8 +227,10 @@ deploy() {
   smoke "$version" \
     || die "smoke test failed, $version is running. Nothing was rolled back; to return to $(previous_version): sudo crm-deploy rollback $DEPLOY_ENV"
 
-  step "Removing old images"
-  prune_images
+  if [ "$DEPLOY_ENV" = prod ]; then
+    step "Removing old images"
+    prune_images
+  fi
   step "Deployed $version"
 }
 
@@ -228,27 +255,37 @@ status() {
 # Name: <prefix>-<date>-<time>-<version running now>.sql.gz; the path goes to LAST_BACKUP
 backup() {
   [ "$DEPLOY_ENV" = prod ] || die "backups are available only for prod"
-  local prefix=${1:-prod} version file
+  local prefix=${1:-prod} version file temporary
+  case "$prefix" in prod|daily|pre-restore) ;; *) die "invalid backup type" ;; esac
+  exec 6>/run/crm-backup.lock
+  flock -w 600 6 || die "staging is reading production backups"
   version=$(current_version)
-  install -d -m 700 "$BACKUP_DIR"
-  file="$BACKUP_DIR/$prefix-$(date +%Y%m%d-%H%M%S)-${version:0:12}"
+  install -d -m 700 "$BACKUP_DIR" || die "could not create the backup directory"
+  file="$BACKUP_DIR/$prefix-$(TZ=Europe/Moscow date +%Y%m%d-%H%M%S%N)-${version:0:12}"
   [ -n "$version" ] && file="$file.sql.gz" || file="${file}none.sql.gz"
+  temporary=$(mktemp "$BACKUP_DIR/.$prefix-XXXXXX.partial") || die "could not create a backup file"
   # $POSTGRES_* expand inside the container, so the password never shows up here
   # </dev/null: docker would otherwise swallow the registry credentials waiting on this script's stdin
-  if ! compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' </dev/null | (umask 077 && gzip > "$file"); then
-    rm -f "$file"
+  if ! compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' </dev/null | gzip > "$temporary"; then
+    rm -f "$temporary"
+    flock -u 6
+    exec 6>&-
     echo "ERROR: backup failed" >&2
     return 1
   fi
+  gzip -t "$temporary" || die "backup archive is damaged: $temporary"
+  mv "$temporary" "$file" || die "could not publish the completed backup: $temporary"
   LAST_BACKUP=$file
   echo "$file ($(du -h "$file" | cut -f1))"
-  if [ "$prefix" = prod ]; then prune_backups; fi
+  if [ "$prefix" != pre-restore ]; then prune_backups "$prefix"; fi
+  flock -u 6
+  exec 6>&-
 }
 
-# Keep the newest KEEP_BACKUPS regular backups; the names sort by date
+# Keep the newest KEEP_BACKUPS files of each regular backup type.
 prune_backups() {
-  local files excess
-  mapfile -t files < <(ls -1 "$BACKUP_DIR"/prod-*.sql.gz | sort)
+  local prefix=$1 files excess
+  mapfile -t files < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name "$prefix-*.sql.gz" -printf '%T@ %p\n' | sort -n | cut -d ' ' -f2-)
   excess=$((${#files[@]} - KEEP_BACKUPS))
   if [ "$excess" -gt 0 ]; then
     rm -f -- "${files[@]:0:excess}"
@@ -313,9 +350,9 @@ restore() {
 
 latest_prod_backup() {
   local files
-  mapfile -t files < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'prod-*.sql.gz' -printf '%f\n' 2>/dev/null | sort)
+  mapfile -t files < <(find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'prod-*.sql.gz' -o -name 'daily-*.sql.gz' \) -printf '%T@ %p\n' 2>/dev/null | sort -n | cut -d ' ' -f2-)
   [ "${#files[@]}" -gt 0 ] || die "no production backup is available in $BACKUP_DIR"
-  printf '%s/%s\n' "$BACKUP_DIR" "${files[-1]}"
+  printf '%s\n' "${files[-1]}"
 }
 
 load_prod_backup_into_staging() {
@@ -516,12 +553,18 @@ case "${1:-}" in
     flock -s -w 600 8 || die "deploy scripts are being updated"
     exec 9>"/run/crm-deploy-$DEPLOY_ENV.lock"
     flock -w 600 9 || die "another $DEPLOY_ENV deployment is still running"
+    case "${1:-}:$DEPLOY_ENV" in
+      deploy:staging|rollback:staging|staging-init:staging|staging-refresh:staging)
+        exec 6>/run/crm-backup.lock
+        flock -s -w 600 6 || die "production backups are being updated"
+        ;;
+    esac
     case "${1:-}" in
       deploy) deploy "$DEPLOY_ENV" "${3:-}" ;;
       rollback) rollback "$DEPLOY_ENV" ;;
       status) status ;;
       logs) compose logs --tail 200 app ;;
-      backup) backup ;;
+      backup) backup "${3:-prod}" ;;
       restore) restore "${3:-}" ;;
       seed) compose run --rm app node scripts/seed.mjs ;;
       staging-init) [ "$DEPLOY_ENV" = staging ] || die "staging-init is staging-only"; staging_init ;;
@@ -529,5 +572,10 @@ case "${1:-}" in
     esac
     ;;
   setup-staging) setup_staging ;;
-  *) die "usage: crm-deploy upload | deploy <prod|staging> <sha> | rollback <prod|staging> | status <prod|staging> | logs <prod|staging> | backup prod | restore prod [file] | staging-init staging | staging-refresh staging | setup-staging | seed <prod|staging>" ;;
+  setup-backups)
+    exec 8>/run/crm-deploy-code.lock
+    flock -x -w 600 8 || die "deploy scripts are in use"
+    setup_backups
+    ;;
+  *) die "usage: crm-deploy upload | deploy <prod|staging> <sha> | rollback <prod|staging> | status <prod|staging> | logs <prod|staging> | backup prod [daily] | restore prod [file] | staging-init staging | staging-refresh staging | setup-staging | setup-backups | seed <prod|staging>" ;;
 esac

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily production database backup for personal CRM
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/crm-deploy backup prod daily
+UMask=0077
+TimeoutStartSec=1h

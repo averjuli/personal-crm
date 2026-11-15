@@ -1,0 +1,54 @@
+name: Deploy prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA (empty selects the latest successful staging deployment)
+        required: false
+        type: string
+      rollback:
+        description: Roll back to the previous production version (ignores SHA)
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+jobs:
+  deploy:
+    name: Deploy prod
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select a verified production version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_SHA: ${{ inputs.sha }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: python3 deploy/github-release.py select
+
+      - name: Upload scripts and deploy prod
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_SHA: ${{ steps.version.outputs.sha }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: bash deploy/ci-deploy.sh prod "$DEPLOY_SHA" "$ROLLBACK"
+
+      - name: Keep the latest ten registry builds
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 deploy/github-release.py prune

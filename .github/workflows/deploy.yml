@@ -1,17 +1,11 @@
-# Build one image per commit, then deploy it to staging and prod in order.
-# Deploy logic stays in deploy/crm-deploy.sh. Secrets: DEPLOY_SSH_KEY and DEPLOY_KNOWN_HOSTS.
+# Build one image per commit and deploy it to staging.
+# Production is released separately through Deploy prod.
 name: Deploy
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      deploy_prod:
-        description: Deploy this SHA to production after staging succeeds
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -48,45 +42,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  upload-deploy-scripts:
-    needs: build
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    concurrency:
-      group: upload-deploy-scripts
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up SSH
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-          Host server
-            HostName 153.76.175.28
-            HostKeyAlias app.vupsen.space
-            User crmapp
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            BatchMode yes
-            ServerAliveInterval 30
-          EOF
-
-      - name: Copy deploy scripts to the server
-        run: tar -C deploy -cz . | ssh server upload
-
-      - name: Remove the SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
-
   deploy-staging:
-    needs: upload-deploy-scripts
+    name: Deploy staging
+    needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
@@ -98,74 +57,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up SSH
+      - name: Upload scripts and deploy staging
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-          Host server
-            HostName 153.76.175.28
-            HostKeyAlias app.vupsen.space
-            User crmapp
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            BatchMode yes
-            ServerAliveInterval 30
-          EOF
-
-      - name: Deploy staging
-        env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s\n' "$GITHUB_ACTOR" "$GHCR_TOKEN" | ssh server deploy staging "$GITHUB_SHA"
-
-      - name: Remove the SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
-
-  deploy-prod:
-    needs: [upload-deploy-scripts, deploy-staging]
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_prod }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    concurrency:
-      group: deploy-prod
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up SSH
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-          Host server
-            HostName 153.76.175.28
-            HostKeyAlias app.vupsen.space
-            User crmapp
-            IdentityFile ~/.ssh/deploy_key
-            IdentitiesOnly yes
-            BatchMode yes
-            ServerAliveInterval 30
-          EOF
-
-      - name: Deploy prod
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s\n' "$GITHUB_ACTOR" "$GHCR_TOKEN" | ssh server deploy prod "$GITHUB_SHA"
-
-      - name: Remove the SSH key
-        if: always()
-        run: rm -f ~/.ssh/deploy_key
+        run: bash deploy/ci-deploy.sh staging "$GITHUB_SHA"
