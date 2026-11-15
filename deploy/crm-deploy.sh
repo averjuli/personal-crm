@@ -194,6 +194,10 @@ deploy() {
     die "$version did not become healthy. Nothing was rolled back; to return to $(previous_version): sudo crm-deploy rollback $DEPLOY_ENV"
   fi
 
+  if [ "$DEPLOY_ENV" = staging ]; then
+    update_staging_proxy
+  fi
+
   step "Smoke test"
   smoke "$version" \
     || die "smoke test failed, $version is running. Nothing was rolled back; to return to $(previous_version): sudo crm-deploy rollback $DEPLOY_ENV"
@@ -455,6 +459,40 @@ NGINX
   fi
   systemctl reload nginx
   echo "Staging HTTPS and password protection configured for https://$host"
+}
+
+update_staging_proxy() {
+  local site=/etc/nginx/sites-available/personal-crm-staging.conf temp backup proxy_count
+  [ -f "$site" ] || die "staging nginx site is missing; run setup-staging"
+  grep -Fqx '    server_name test-app.vupsen.space;' "$site" \
+    || die "staging nginx site does not match the managed site; refusing to change it"
+  proxy_count=$(grep -Ec '^[[:space:]]*proxy_pass http://127\.0\.0\.1:[0-9]+;$' "$site" || true)
+  [ "$proxy_count" -eq 2 ] || die "staging nginx site has an unexpected proxy configuration; refusing to change it"
+
+  temp=$(mktemp)
+  sed -E "s#^([[:space:]]*proxy_pass http://127\\.0\\.0\\.1:)[0-9]+;#\\1$APP_PORT;#" "$site" > "$temp"
+  if cmp -s "$site" "$temp"; then
+    rm -f "$temp"
+    return
+  fi
+
+  backup=$(mktemp)
+  cp -p "$site" "$backup"
+  install -m 644 "$temp" "$site"
+  rm -f "$temp"
+  if ! nginx -t >/dev/null; then
+    cp -p "$backup" "$site"
+    rm -f "$backup"
+    die "staging nginx config test failed; previous staging site config restored"
+  fi
+  if ! systemctl reload nginx; then
+    cp -p "$backup" "$site"
+    nginx -t >/dev/null && systemctl reload nginx || true
+    rm -f "$backup"
+    die "staging nginx reload failed; previous staging site config restored"
+  fi
+  rm -f "$backup"
+  step "Updated staging nginx proxy to 127.0.0.1:$APP_PORT"
 }
 
 [ "$(id -u)" -eq 0 ] || die "run through sudo: sudo crm-deploy ${1:-}"
