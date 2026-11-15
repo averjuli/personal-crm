@@ -389,7 +389,7 @@ setup_staging() {
   read -r -s -p 'HTTP Basic Auth password: ' password; echo
   read -r -s -p 'Repeat password: ' confirmation; echo
   [ -n "$password" ] && [ "$password" = "$confirmation" ] || die "passwords do not match"
-  install -m 600 /dev/null "$auth_file"
+  install -o root -g www-data -m 640 /dev/null "$auth_file"
   printf '%s\n' "$password" | htpasswd -iB "$auth_file" "$username" >/dev/null
   unset password confirmation
 
@@ -462,10 +462,15 @@ NGINX
 }
 
 update_staging_proxy() {
-  local site=/etc/nginx/sites-available/personal-crm-staging.conf temp backup proxy_count
+  local site=/etc/nginx/sites-available/personal-crm-staging.conf
+  local auth_file=/etc/nginx/personal-crm-staging.htpasswd
+  local temp backup proxy_count
   [ -f "$site" ] || die "staging nginx site is missing; run setup-staging"
   grep -Fqx '    server_name test-app.vupsen.space;' "$site" \
     || die "staging nginx site does not match the managed site; refusing to change it"
+  [ -s "$auth_file" ] || die "staging Basic Auth file is missing; run setup-staging"
+  chown root:www-data "$auth_file"
+  chmod 640 "$auth_file"
   proxy_count=$(grep -Ec '^[[:space:]]*proxy_pass http://127\.0\.0\.1:[0-9]+;$' "$site" || true)
   [ "$proxy_count" -eq 2 ] || die "staging nginx site has an unexpected proxy configuration; refusing to change it"
 
