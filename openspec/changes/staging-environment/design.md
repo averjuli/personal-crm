@@ -8,7 +8,7 @@
 
 ## Auth and edge
 
-Оба окружения передают собственный `BETTER_AUTH_URL`. Better Auth не получает `cookieDomain`, значит cookies остаются host-only. Nginx добавляет staging virtual host, HTTP Basic Authentication и TLS. Сертификат выпускается certbot для `test-app.vupsen.space`; настройки существующих сайтов не переписываются. Staging deploy проверяет и обновляет upstream только в своём nginx site, проверяет конфигурацию и восстанавливает прежний файл, если проверка или reload не проходят.
+Оба окружения передают собственный `BETTER_AUTH_URL`. Better Auth не получает `cookieDomain`, значит cookies остаются host-only. Nginx добавляет staging virtual host, HTTP Basic Authentication и TLS. Сертификат выпускается certbot для `test-app.vupsen.space`; настройки существующих сайтов не переписываются. Файл Basic Auth принадлежит `root:www-data` с правами `640`, чтобы nginx мог его читать. Staging deploy проверяет и обновляет upstream только в своём nginx site, проверяет конфигурацию и восстанавливает прежний файл, если проверка или reload не проходят.
 
 ## GitHub Actions
 
