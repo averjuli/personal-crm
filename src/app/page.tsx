@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ContactSearch } from "@/components/contact-search";
 import { ContactsTable } from "@/components/contacts-table";
 import { OverdueContacts } from "@/components/overdue-contacts";
+import { UpcomingBirthdays } from "@/components/upcoming-birthdays";
 import { StatusPill } from "@/components/status-pill";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
   listContacts,
   listGroups,
   listOverdueContacts,
+  listUpcomingBirthdays,
 } from "@/lib/contacts";
 import { findSelectedGroup } from "@/lib/group-filter";
 import { requireUserId } from "@/lib/session";
@@ -62,16 +64,20 @@ async function ContactsSection({
   const groupId = selectedGroup?.id ?? null;
   // The "time to reach out" block is hidden while searching and is not
   // filtered by group
-  const [contacts, overdue, anyContacts] = await Promise.all([
+  const [contacts, overdue, anyContacts, birthdays] = await Promise.all([
     listContacts(ownerId, search, groupId),
     search ? null : listOverdueContacts(ownerId),
     hasContacts(ownerId),
+    search ? null : listUpcomingBirthdays(ownerId),
   ]);
 
   return (
     <div className="grid gap-4">
       {deleted === "1" && (
         <StatusPill role="status">Контакт удалён.</StatusPill>
+      )}
+      {birthdays && birthdays.length > 0 && (
+        <UpcomingBirthdays contacts={birthdays} />
       )}
       {/* Someone without a single contact has nobody to keep in touch with */}
       {overdue && anyContacts && <OverdueContacts contacts={overdue} />}

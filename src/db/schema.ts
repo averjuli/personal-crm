@@ -131,6 +131,9 @@ export const contacts = pgTable(
     howWeMet: text("how_we_met"),
     phone: text("phone"),
     email: text("email"),
+    birthDay: integer("birth_day"),
+    birthMonth: integer("birth_month"),
+    birthYear: integer("birth_year"),
     // Deprecated: replaced by the notes table, kept only so that a manual
     // rollback to the previous image still works. Not read or written by new code
     notes: text("notes"),
@@ -152,6 +155,22 @@ export const contacts = pgTable(
   },
   (table) => [
     index("contacts_owner_id_idx").on(table.ownerId),
+    check(
+      "contacts_birthday_check",
+      sql`case
+        when ${table.birthDay} is null and ${table.birthMonth} is null and ${table.birthYear} is null then true
+        when ${table.birthDay} is null or ${table.birthMonth} is null then false
+        else ${table.birthMonth} between 1 and 12
+          and (${table.birthYear} is null or ${table.birthYear} > 0)
+          and ${table.birthDay} between 1 and case
+            when ${table.birthMonth} = 2 then case
+              when coalesce(${table.birthYear}, 2000) % 400 = 0
+                or (coalesce(${table.birthYear}, 2000) % 4 = 0 and coalesce(${table.birthYear}, 2000) % 100 <> 0)
+              then 29 else 28 end
+            when ${table.birthMonth} in (4, 6, 9, 11) then 30
+            else 31 end
+        end`,
+    ),
     check(
       "contacts_contact_frequency_check",
       sql`${table.contactFrequency} in ('week', 'month', 'quarter', 'year')`,

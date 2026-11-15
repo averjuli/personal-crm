@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { contactFrequencies } from "@/db/schema";
+import { isValidBirthday, parseBirthdayPart } from "@/lib/birthdays";
 import { parseGroupIds } from "@/lib/group-form";
 
 // Empty or whitespace-only inputs are stored as NULL
@@ -11,31 +12,44 @@ const optionalText = (max: number) =>
     .max(max, `Не больше ${max} символов`)
     .transform((value) => value || null);
 
-export const contactInputSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Укажите имя")
-    .max(200, "Не больше 200 символов"),
-  about: optionalText(500),
-  howWeMet: optionalText(500),
-  phone: optionalText(50),
-  email: z
-    .string()
-    .trim()
-    .max(320, "Не больше 320 символов")
-    .refine(
-      (value) => value === "" || z.email().safeParse(value).success,
-      "Похоже, в адресе почты опечатка",
-    )
-    .transform((value) => value || null),
-  // "" is "not set"
-  frequency: z
-    .enum(["", ...contactFrequencies], "Выберите один из вариантов")
-    .transform((value) => value || null),
-  // First note of a new contact; the edit form has no such field
-  note: optionalText(20_000),
-});
+export const contactInputSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Укажите имя")
+      .max(200, "Не больше 200 символов"),
+    about: optionalText(500),
+    howWeMet: optionalText(500),
+    phone: optionalText(50),
+    email: z
+      .string()
+      .trim()
+      .max(320, "Не больше 320 символов")
+      .refine(
+        (value) => value === "" || z.email().safeParse(value).success,
+        "Похоже, в адресе почты опечатка",
+      )
+      .transform((value) => value || null),
+    // "" is "not set"
+    frequency: z
+      .enum(["", ...contactFrequencies], "Выберите один из вариантов")
+      .transform((value) => value || null),
+    // First note of a new contact; the edit form has no such field
+    note: optionalText(20_000),
+    birthDay: z.string().trim().default("").transform(parseBirthdayPart),
+    birthMonth: z.string().trim().default("").transform(parseBirthdayPart),
+    birthYear: z.string().trim().default("").transform(parseBirthdayPart),
+  })
+  .superRefine((values, context) => {
+    if (!isValidBirthday(values)) {
+      context.addIssue({
+        code: "custom",
+        path: ["birthDay"],
+        message: "Укажите существующую дату рождения",
+      });
+    }
+  });
 
 type ContactFields = z.output<typeof contactInputSchema>;
 export type ContactField = keyof ContactFields;
@@ -64,6 +78,9 @@ export const contactFields: ContactField[] = [
   "email",
   "frequency",
   "note",
+  "birthDay",
+  "birthMonth",
+  "birthYear",
 ];
 
 export function readContactForm(formData: FormData): ContactFormValues {

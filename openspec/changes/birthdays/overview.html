@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Дни рождения — обзор фичи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Unbounded:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Tokens copied from src/app/globals.css and the installed Tailwind theme. */
+:root {
+ --background:#fafaf7;--foreground:#111111;--card:#ffffff;--card-foreground:#111111;
+ --popover:#ffffff;--popover-foreground:#111111;--primary:#d4f25a;--primary-foreground:#111111;
+ --secondary:#f1f1ec;--secondary-foreground:#111111;--muted:#f1f1ec;--muted-foreground:#55554f;
+ --subtle-foreground:#77776f;--accent:#d4f25a;--accent-foreground:#111111;--destructive:#c4321c;
+ --border:#ecece6;--border-dashed:#b9b9b1;--input:#ecece6;--ring:#111111;--radius:.875rem;
+ --font-sans:"Manrope Variable","Manrope",sans-serif;--font-heading:"Unbounded Variable","Unbounded",sans-serif;
+ --text-title:1.75rem;--text-title--line-height:1.15;--text-title--letter-spacing:-.03em;
+ --text-title-lg:2.5rem;--text-title-lg--line-height:1.1;--text-title-lg--letter-spacing:-.035em;
+ --container-page:75rem;--spacing:.25rem;--text-sm:.875rem;--text-base:1rem;--text-lg:1.125rem;
+ --text-xl:1.25rem;--text-2xl:1.5rem;--text-3xl:1.875rem;--font-weight-medium:500;--font-weight-semibold:600;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(var(--spacing)*8)}
+body{margin:0;background:var(--background);color:var(--foreground);font:var(--text-base)/1.65 var(--font-sans)}
+a{color:inherit;text-underline-offset:calc(var(--spacing));text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,button:focus-visible{outline:2px solid var(--ring);outline-offset:4px}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.page{max-width:var(--container-page);margin:auto;padding:calc(var(--spacing)*10) calc(var(--spacing)*10) calc(var(--spacing)*20)}
+.brand{display:flex;align-items:center;gap:calc(var(--spacing)*3);font-family:var(--font-heading);font-size:var(--text-sm);font-weight:var(--font-weight-semibold)}
+.logo{display:block;width:calc(var(--spacing)*7);height:calc(var(--spacing)*7);border:1.5px solid var(--foreground);border-radius:50%;background:var(--primary);flex-shrink:0}
+.hero{padding:calc(var(--spacing)*12) 0 calc(var(--spacing)*8);border-bottom:1.5px solid var(--foreground)}
+.eyebrow{text-transform:uppercase;letter-spacing:.09em;font-size:var(--text-sm);color:var(--muted-foreground);margin:0 0 calc(var(--spacing)*4)}
+h1,h2,h3,h4,p{margin:0}
+h1,h2,h3{font-family:var(--font-heading);font-weight:var(--font-weight-medium)}
+h1{font-size:var(--text-title-lg);line-height:var(--text-title-lg--line-height);letter-spacing:var(--text-title-lg--letter-spacing);max-width:100%}
+.lead{font-size:var(--text-lg);max-width:calc(var(--spacing)*210);margin-top:calc(var(--spacing)*6);color:var(--muted-foreground)}
+.chips{display:flex;flex-wrap:wrap;gap:calc(var(--spacing)*2);margin-top:calc(var(--spacing)*6)}
+.chip,.tag{display:inline-flex;align-items:center;border:1px solid var(--border-dashed);border-radius:calc(var(--radius)*2);padding:calc(var(--spacing)) calc(var(--spacing)*3);font-size:var(--text-sm);background:var(--card)}
+.chip.active{background:var(--primary);border-color:var(--foreground)}
+.tag{padding:0 calc(var(--spacing)*2);color:var(--muted-foreground);background:var(--secondary);border-color:var(--border)}
+.nav{display:flex;flex-wrap:wrap;gap:calc(var(--spacing)*2) calc(var(--spacing)*6);margin-top:calc(var(--spacing)*7);font-size:var(--text-sm)}
+section{margin-top:calc(var(--spacing)*16)}
+h2{font-size:var(--text-2xl);line-height:1.4;letter-spacing:-.025em;display:flex;gap:calc(var(--spacing)*4);align-items:baseline;margin-bottom:calc(var(--spacing)*6)}
+.section-number{font:var(--text-sm)/1 var(--font-sans);color:var(--subtle-foreground)}
+h3{font-size:var(--text-lg);line-height:1.5;margin-bottom:calc(var(--spacing)*3)}
+h4{font-size:var(--text-base);font-weight:var(--font-weight-semibold)}
+.prose p+p{margin-top:calc(var(--spacing)*3)}
+.muted,.caption{color:var(--muted-foreground)}
+.caption{font-size:var(--text-sm);margin-top:calc(var(--spacing)*3)}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:calc(var(--radius)*1.8);padding:calc(var(--spacing)*7)}
+.callout{background:var(--secondary);border-left:3px solid var(--foreground);padding:calc(var(--spacing)*5) calc(var(--spacing)*6);border-radius:0 var(--radius) var(--radius) 0;margin-top:calc(var(--spacing)*5)}
+.callout.highlight{background:var(--primary);border-color:var(--foreground)}
+.screen{margin-top:calc(var(--spacing)*8)}
+.screen-heading{display:flex;flex-wrap:wrap;align-items:center;gap:calc(var(--spacing)*3);margin-bottom:calc(var(--spacing)*3)}
+.screen-heading h3{margin:0}
+.mock{border:1.5px solid var(--foreground);border-radius:calc(var(--radius)*1.8);background:var(--background);padding:calc(var(--spacing)*6)}
+.mock-bar{display:flex;justify-content:space-between;gap:calc(var(--spacing)*4);padding-bottom:calc(var(--spacing)*4);margin-bottom:calc(var(--spacing)*5);border-bottom:1px solid var(--border);font-size:var(--text-sm)}
+.mock-bar b{font-family:var(--font-heading);font-weight:var(--font-weight-medium)}
+.mock-header{display:flex;flex-wrap:wrap;gap:calc(var(--spacing)*3);align-items:center;justify-content:space-between;margin-bottom:calc(var(--spacing)*6)}
+.mock-title{font-family:var(--font-heading);font-size:var(--text-xl)}
+.mock-button{display:inline-block;background:var(--primary);border:1.5px solid var(--foreground);border-radius:var(--radius);padding:calc(var(--spacing)*2) calc(var(--spacing)*4);font-size:var(--text-sm);font-weight:var(--font-weight-semibold)}
+.mock-form{max-width:calc(var(--spacing)*170);display:grid;gap:calc(var(--spacing)*4)}
+.mock-label{display:block;font-size:var(--text-sm);color:var(--muted-foreground);margin-bottom:calc(var(--spacing)*2)}
+.mock-input{background:var(--card);border:1px solid var(--input);border-radius:calc(var(--radius)*.8);padding:calc(var(--spacing)*3) calc(var(--spacing)*4);min-height:calc(var(--spacing)*12)}
+.mock-input.placeholder{color:var(--subtle-foreground)}
+.mock-existing{display:flex;flex-wrap:wrap;gap:calc(var(--spacing)*2) calc(var(--spacing)*5);font-size:var(--text-sm);color:var(--muted-foreground);padding:calc(var(--spacing)*3) 0}
+.new{border:2px dashed var(--foreground);background:var(--card);border-radius:calc(var(--radius)*1.4);padding:calc(var(--spacing)*5)}
+.new-label{display:inline-block;font-size:var(--text-sm);font-weight:var(--font-weight-semibold);background:var(--primary);padding:0 calc(var(--spacing)*2);border-radius:calc(var(--radius)*.4);margin-bottom:calc(var(--spacing)*3)}
+.date-fields{display:grid;grid-template-columns:1fr 1.5fr 1.7fr;gap:calc(var(--spacing)*3)}
+.mock-block{margin-bottom:calc(var(--spacing)*5)}
+.mock-block-title{font-size:var(--text-lg);font-weight:var(--font-weight-semibold);margin-bottom:calc(var(--spacing)*3)}
+.mock-list{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);overflow:hidden}
+.mock-row{display:flex;justify-content:space-between;gap:calc(var(--spacing)*4);padding:calc(var(--spacing)*3) calc(var(--spacing)*4);border-bottom:1px solid var(--border)}
+.mock-row:last-child{border-bottom:0}
+.mock-link{font-weight:var(--font-weight-semibold);text-decoration:underline;text-underline-offset:3px}
+.mock-date{white-space:nowrap;color:var(--muted-foreground)}
+.mock-search{display:grid;grid-template-columns:2fr 1fr;gap:calc(var(--spacing)*3);margin-top:calc(var(--spacing)*5)}
+.rule{display:grid;grid-template-columns:calc(var(--spacing)*11) 1fr;gap:calc(var(--spacing)*4);padding:calc(var(--spacing)*6) 0;border-top:1px solid var(--border)}
+.rule:last-child{border-bottom:1px solid var(--border)}
+.rule-index{display:flex;align-items:center;justify-content:center;width:calc(var(--spacing)*10);height:calc(var(--spacing)*10);border:1.5px solid var(--foreground);border-radius:50%;background:var(--primary);font-weight:var(--font-weight-semibold)}
+.rule p{margin-top:calc(var(--spacing)*2)}
+.rule-example{color:var(--muted-foreground);font-size:var(--text-sm)}
+.legend{display:flex;gap:calc(var(--spacing)*6);flex-wrap:wrap;font-size:var(--text-sm);margin:calc(var(--spacing)*4) 0}
+.legend span{display:flex;align-items:center;gap:calc(var(--spacing)*2)}
+.swatch{display:inline-block;width:calc(var(--spacing)*4);height:calc(var(--spacing)*4);border:1px solid var(--border-dashed);background:var(--card);border-radius:calc(var(--spacing))}
+.swatch.added{background:var(--primary);border-color:var(--foreground)}
+.schema-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:calc(var(--radius)*1.4);background:var(--card)}
+.schema-svg{display:block;width:100%;min-width:calc(var(--spacing)*175);height:auto;max-height:calc(var(--spacing)*180)}
+.table-box{fill:var(--card);stroke:var(--border-dashed);stroke-width:1.2}
+.table-head{fill:var(--secondary)}
+.table-name{font:600 14px var(--font-sans);fill:var(--foreground)}
+.table-subtitle{font:12px var(--font-sans);fill:var(--muted-foreground)}
+.table-row{font:13px var(--font-sans);fill:var(--foreground)}
+.new-row{fill:var(--primary)}
+.schema-lines{fill:none;stroke:var(--border-dashed);stroke-width:1.5}
+.arrow-shape{fill:none;stroke:var(--border-dashed);stroke-width:1.3}
+.relation-label{font:12px var(--font-sans);fill:var(--muted-foreground)}
+.subsection{margin-top:calc(var(--spacing)*8)}
+.lookup{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--spacing)*4);margin-top:calc(var(--spacing)*4)}
+.lookup>div{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:calc(var(--spacing)*5)}
+.lookup p{margin-top:calc(var(--spacing)*3)}
+.result{font-weight:var(--font-weight-semibold);border-top:1px solid var(--border);padding-top:calc(var(--spacing)*3)}
+.migration{background:var(--card);border:1.5px solid var(--foreground);border-radius:calc(var(--radius)*1.4);padding:calc(var(--spacing)*6);margin-top:calc(var(--spacing)*4)}
+.migration ul,.decision-list{padding-left:calc(var(--spacing)*5);margin:calc(var(--spacing)*3) 0 0}
+.migration li,.decision-list li{margin:calc(var(--spacing)*2) 0}
+code{font-family:ui-monospace,monospace;font-size:.9em;background:var(--secondary);padding:0 calc(var(--spacing));border-radius:calc(var(--spacing));overflow-wrap:anywhere}
+.check-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:calc(var(--spacing)*4);margin:calc(var(--spacing)*6) 0}
+select{border:1px solid var(--border-dashed);background:var(--card);border-radius:var(--radius);padding:calc(var(--spacing)*2) calc(var(--spacing)*3);color:var(--foreground);max-width:100%}
+.check-progress{font-size:var(--text-sm);font-weight:var(--font-weight-semibold)}
+.checklist{display:grid;gap:calc(var(--spacing)*4)}
+.check-item{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);overflow:hidden}
+.check-item:has(input:checked){border-color:var(--foreground)}
+.check-title{display:flex;align-items:baseline;gap:calc(var(--spacing)*3);padding:calc(var(--spacing)*5);cursor:pointer}
+.scenario-check{accent-color:var(--foreground);width:calc(var(--spacing)*4);height:calc(var(--spacing)*4);flex-shrink:0}
+.check-number{font-size:var(--text-sm);color:var(--subtle-foreground)}
+.check-body{padding:0 calc(var(--spacing)*6) calc(var(--spacing)*5) calc(var(--spacing)*15)}
+.check-body ol{padding-left:calc(var(--spacing)*5);margin:calc(var(--spacing)*3) 0}
+.check-body li+li{margin-top:calc(var(--spacing)*2)}
+.expected{background:var(--secondary);border-radius:calc(var(--radius)*.8);padding:calc(var(--spacing)*3) calc(var(--spacing)*4)}
+[hidden]{display:none!important}
+.decision-section{margin-top:calc(var(--spacing)*6)}
+footer{border-top:1px solid var(--border);margin-top:calc(var(--spacing)*12);padding-top:calc(var(--spacing)*6);color:var(--muted-foreground);font-size:var(--text-sm)}
+@media(max-width:48rem){
+ .page{padding:calc(var(--spacing)*6) calc(var(--spacing)*5) calc(var(--spacing)*12)}
+ .hero{padding-top:calc(var(--spacing)*8)}
+ h1{font-size:var(--text-title);line-height:var(--text-title--line-height);letter-spacing:var(--text-title--letter-spacing)}
+ h2{font-size:var(--text-xl);gap:calc(var(--spacing)*3)}
+ section{margin-top:calc(var(--spacing)*12)}
+ .panel,.mock,.new{padding:calc(var(--spacing)*4)}
+ .date-fields{grid-template-columns:1fr 1.2fr}
+ .date-fields>div:last-child{grid-column:1/-1}
+ .mock-search,.lookup{grid-template-columns:1fr}
+ .mock-row{padding:calc(var(--spacing)*3);gap:calc(var(--spacing)*2)}
+ .mock-row>span:first-child{min-width:0;overflow-wrap:anywhere}
+ .check-title{padding:calc(var(--spacing)*4);gap:calc(var(--spacing)*2)}
+ .check-body{padding:0 calc(var(--spacing)*4) calc(var(--spacing)*4)}
+ .rule{grid-template-columns:calc(var(--spacing)*10) 1fr;gap:calc(var(--spacing)*3)}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{.page{padding:0}.nav,.check-controls{display:none}section{break-before:auto}.screen,.check-item,.rule,.migration{break-inside:avoid}.schema-svg{min-width:0}.schema-scroll{overflow:visible}}
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+ <div class="brand"><span class="logo" aria-hidden="true"></span>Личная CRM <span class="muted">/ обзор фичи</span></div>
+ <div class="hero" id="summary">
+  <p class="eyebrow">birthdays · план на 15 ноября 2026</p>
+  <h1>Не пропустить<br>день рождения</h1>
+  <p class="lead">У контакта появится необязательная дата рождения — год можно не знать. На главной будут видны те, кого поздравлять сегодня и в следующие семь дней.</p>
+  <div class="chips"><span class="chip active">Спроектирована</span><span class="chip">0 из 18 задач выполнено</span><span class="chip">36 сценариев проверки</span></div>
+  <p class="caption">Код фичи и новые автотесты ещё не написаны. Для пяти прежних сценариев доступа уже есть тесты. Ниже — планируемое поведение и наброски экранов.</p>
+  <nav class="nav" aria-label="Разделы обзора"><a href="#screens">Экраны</a><a href="#rules">Правила</a><a href="#data">Данные</a><a href="#checks">Проверить руками</a><a href="#decisions">Решения агента</a><a href="#questions">Неясное</a></nav>
+ </div>
+</header>
+<main>
+<section id="screens">
+ <h2><span class="section-number">01</span>Что появится на экранах</h2>
+ <p class="muted">Пунктиром выделено новое. Имена и даты — примеры; это наброски, не работающая CRM.</p>
+ <div class="screen">
+  <div class="screen-heading"><h3>Новый контакт</h3><span class="tag">Год необязателен</span></div>
+  <div class="mock" role="img" aria-label="Форма нового контакта: новое поле даты рождения с днём, месяцем и необязательным годом">
+   <div class="mock-bar"><b>Личная CRM</b><span>Мой аккаунт</span></div>
+   <div class="mock-header"><span class="mock-title">Новый контакт</span></div>
+   <div class="mock-form">
+    <div><span class="mock-label">Имя</span><div class="mock-input">Вера Лебедева</div></div>
+    <div class="mock-existing"><span>Кто это</span><span>Откуда знакомы</span><span>Телефон</span><span>Почта</span></div>
+    <div class="new"><span class="new-label">Новое</span><h4>Дата рождения</h4><div class="date-fields"><div><span class="mock-label">День</span><div class="mock-input">17</div></div><div><span class="mock-label">Месяц</span><div class="mock-input">Ноябрь</div></div><div><span class="mock-label">Год · необязательно</span><div class="mock-input placeholder">Не указан</div></div></div></div>
+    <div class="mock-existing"><span>Группы</span><span>Как часто общаться</span><span>Первая заметка</span></div>
+    <div><span class="mock-button">Добавить контакт</span></div>
+   </div>
+  </div>
+  <p class="caption">Можно не заполнять ничего. Если дата известна, день и месяц вводятся вместе.</p>
+ </div>
+ <div class="screen" id="screen-card">
+  <div class="screen-heading"><h3>Карточка контакта</h3><span class="tag">Сохранение общей кнопкой</span></div>
+  <div class="mock" role="img" aria-label="Карточка Анны Смирновой: редактируемая дата 20 ноября 1990, год можно очистить">
+   <div class="mock-bar"><b>Личная CRM</b><span>← К списку</span></div>
+   <div class="mock-header"><span class="mock-title">Анна Смирнова</span></div>
+   <div class="mock-form">
+    <div><span class="mock-label">Кто это</span><div class="mock-input">Коллега по прошлой работе</div></div>
+    <div class="new"><span class="new-label">Новое</span><h4>Дата рождения</h4><div class="date-fields"><div><span class="mock-label">День</span><div class="mock-input">20</div></div><div><span class="mock-label">Месяц</span><div class="mock-input">Ноябрь</div></div><div><span class="mock-label">Год · необязательно</span><div class="mock-input">1990</div></div></div></div>
+    <p class="caption">Год можно добавить или стереть. Чтобы убрать дату целиком — очистить все три части и сохранить.</p>
+    <div><span class="mock-label">Как часто общаться</span><div class="mock-input">Раз в месяц</div></div>
+    <div><span class="mock-button">Сохранить</span></div>
+   </div>
+  </div>
+  <p class="caption">Группы, заметки и история общения сохраняют прежнее поведение.</p>
+ </div>
+ <div class="screen">
+  <div class="screen-heading"><h3>Главная</h3><span class="tag">Пример: сегодня 15 ноября</span></div>
+  <div class="mock" role="img" aria-label="Главная: новый блок дней рождения над Пора связаться, затем поиск и общий список">
+   <div class="mock-bar"><b>Личная CRM</b><span>Мой аккаунт</span></div>
+   <div class="mock-header"><span class="mock-title">Контакты</span><span class="mock-button">Добавить контакт</span></div>
+   <div class="mock-block new"><span class="new-label">Новый блок</span><div class="mock-block-title">Скоро день рождения</div><div class="mock-list">
+    <div class="mock-row"><span class="mock-link">Борис Орлов</span><span class="mock-date">15 ноября</span></div>
+    <div class="mock-row"><span class="mock-link">Вера Лебедева</span><span class="mock-date">17 ноября</span></div>
+    <div class="mock-row"><span class="mock-link">Анна Смирнова</span><span class="mock-date">20 ноября</span></div>
+   </div></div>
+   <div class="mock-block"><div class="mock-block-title">Пора связаться</div><div class="mock-list"><div class="mock-row"><span>Анна Смирнова<br><span class="caption">Раз в месяц · просрочено на 2 дня</span></span><span aria-hidden="true">✓ &nbsp; ×</span></div></div></div>
+   <div class="mock-search"><div class="mock-input placeholder">Поиск по имени или группе</div><div class="mock-input">Все группы ▾</div></div>
+   <p class="caption">Всего контактов: 3</p>
+   <div class="mock-list"><div class="mock-row"><span>Анна Смирнова</span><span class="muted">Друзья</span></div><div class="mock-row"><span>Борис Орлов</span><span class="muted">Теннис</span></div><div class="mock-row"><span>Вера Лебедева</span><span class="muted">Друзья</span></div></div>
+  </div>
+  <p class="caption">Имя именинника открывает его карточку. В строке — только имя и день с месяцем; возраст и год рождения не показаны.</p>
+ </div>
+</section>
+<section id="rules">
+ <h2><span class="section-number">02</span>Как это работает</h2>
+ <div class="rules"><article class="rule"><span class="rule-index" aria-hidden="true">1</span><div><h4>Дата может быть пустой</h4><p>Знаете только день и месяц — этого достаточно. Год можно дописать позже или снова убрать.</p><p class="rule-example">Например: «15 ноября», без вымышленного года.</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">2</span><div><h4>Сегодня и ещё семь дней</h4><p>Обе границы включены. Получается восемь календарных дат; сегодня определяется по Москве.</p><p class="rule-example">Если сегодня 15 ноября: с 15 по 22 ноября включительно. 23 ноября уже не попадёт.</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">3</span><div><h4>Ближайшие стоят выше</h4><p>Сначала сегодняшние именинники, потом следующие. Если день рождения в один день — по имени.</p><p class="rule-example">Борис — 15 ноября, Вера — 17 ноября, Анна — 20 ноября.</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">4</span><div><h4>29 февраля не потеряется</h4><p>В невисокосный год показываем 28 февраля, в високосный — 29 февраля. В карточке исходная дата остаётся.</p><p class="rule-example">В 2027 году в блоке «28 февраля», в карточке «29 февраля».</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">5</span><div><h4>Поиск скрывает блок, группа — не фильтрует</h4><p>При непустом поиске блок исчезает, после сброса возвращается. Выбранная группа влияет только на общий список.</p><p class="rule-example">Именинник вне «Тенниса» всё равно будет в блоке.</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">6</span><div><h4>Если именинников нет, блока тоже нет</h4><p>Пустой заголовок и пустая карточка не показываются. Один человек может быть и среди именинников, и в «Пора связаться».</p><p class="rule-example">Частота общения, отметки и заметки работают по прежним правилам.</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">7</span><div><h4>У каждого свои именинники</h4><p>Сервер берёт только контакты того, кто вошёл. Имя и дата чужого контакта не попадают на страницу.</p><p class="rule-example">Пользователь B не увидит сегодняшнего именинника пользователя A.</p></div></article><article class="rule"><span class="rule-index" aria-hidden="true">8</span><div><h4>Сохраняется настоящая дата</h4><p>31 апреля и неполная пара дня с месяцем не сохраняются. Если год известен, проверяется и високосность этого года.</p><p class="rule-example">29 февраля 1991 года — ошибка. 29 февраля без года — допустимо.</p></div></article></div>
+ <div class="callout"><p>Писем, push-уведомлений и кнопки «Поздравил» в этом изменении нет. Открытая страница пересчитает дни рождения при следующей серверной загрузке, например после перезагрузки.</p></div>
+</section>
+<section id="data">
+ <h2><span class="section-number">03</span>Модель данных до и после</h2>
+ <p class="muted">Меняется только таблица контактов. Показаны относящиеся к фиче таблицы и часть их полей; остальные поля и служебные таблицы остаются прежними.</p>
+ <div class="legend"><span><i class="swatch added" aria-hidden="true"></i>новое</span><span><i class="swatch" aria-hidden="true"></i>как было</span></div>
+ <div class="subsection"><h3>Сейчас: даты рождения нет</h3><div class="schema-scroll"><svg class="schema-svg" viewBox="0 0 800 580" role="img" aria-labelledby="schema-before-title"><title id="schema-before-title">Сейчас: пользователи, контакты, заметки, группы и состав групп</title><defs><marker id="arrow-before" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" class="arrow-shape"/></marker></defs><g class="schema-lines" marker-end="url(#arrow-before)"><path d="M350 120 V148 H165 V175"/><path d="M450 120 V148 H640 V175"/><path d="M165 330 V405"/><path d="M315 260 H400 V445 H460"/><path d="M640 305 V415"/></g><text x="190" y="143" class="relation-label">владелец</text><text x="540" y="143" class="relation-label">владелец</text><g class="table-card"><rect x="295" y="20" width="210" height="105" rx="12" class="table-box"/><path d="M307 20 H493 Q505 20 505 32 V62 H295 V32 Q295 20 307 20" class="table-head"/><text x="310" y="47" class="table-name">users</text><text x="490" y="47" class="table-subtitle" text-anchor="end">пользователи</text><text x="310" y="86" class="table-row">id</text><text x="310" y="111" class="table-row">email</text></g><g class="table-card"><rect x="15" y="175" width="300" height="155" rx="12" class="table-box"/><path d="M27 175 H303 Q315 175 315 187 V217 H15 V187 Q15 175 27 175" class="table-head"/><text x="30" y="202" class="table-name">contacts</text><text x="300" y="202" class="table-subtitle" text-anchor="end">контакты</text><text x="30" y="241" class="table-row">id — номер контакта</text><text x="30" y="266" class="table-row">owner_id — чей контакт</text><text x="30" y="291" class="table-row">name, about, phone, email</text><text x="30" y="316" class="table-row">contact_frequency, …</text></g><g class="table-card"><rect x="500" y="175" width="280" height="130" rx="12" class="table-box"/><path d="M512 175 H768 Q780 175 780 187 V217 H500 V187 Q500 175 512 175" class="table-head"/><text x="515" y="202" class="table-name">groups</text><text x="765" y="202" class="table-subtitle" text-anchor="end">группы</text><text x="515" y="241" class="table-row">id</text><text x="515" y="266" class="table-row">owner_id — чья группа</text><text x="515" y="291" class="table-row">name</text></g><g class="table-card"><rect x="15" y="405" width="300" height="130" rx="12" class="table-box"/><path d="M27 405 H303 Q315 405 315 417 V447 H15 V417 Q15 405 27 405" class="table-head"/><text x="30" y="432" class="table-name">notes</text><text x="300" y="432" class="table-subtitle" text-anchor="end">заметки</text><text x="30" y="471" class="table-row">id, contact_id</text><text x="30" y="496" class="table-row">body — текст</text><text x="30" y="521" class="table-row">noted_on — дата общения</text></g><g class="table-card"><rect x="460" y="415" width="320" height="105" rx="12" class="table-box"/><path d="M472 415 H768 Q780 415 780 427 V457 H460 V427 Q460 415 472 415" class="table-head"/><text x="475" y="442" class="table-name">contact_groups</text><text x="765" y="442" class="table-subtitle" text-anchor="end">состав групп</text><text x="475" y="481" class="table-row">contact_id — контакт</text><text x="475" y="506" class="table-row">group_id — группа</text></g></svg></div></div>
+ <div class="subsection"><h3>После: три новых поля у контакта</h3><div class="schema-scroll"><svg class="schema-svg" viewBox="0 0 800 670" role="img" aria-labelledby="schema-after-title"><title id="schema-after-title">После: у контакта три новых поля, остальные таблицы и связи прежние</title><defs><marker id="arrow-after" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" class="arrow-shape"/></marker></defs><g class="schema-lines" marker-end="url(#arrow-after)"><path d="M350 120 V148 H165 V175"/><path d="M450 120 V148 H640 V175"/><path d="M165 405 V495"/><path d="M315 260 H400 V535 H460"/><path d="M640 305 V505"/></g><text x="190" y="143" class="relation-label">владелец</text><text x="540" y="143" class="relation-label">владелец</text><g class="table-card"><rect x="295" y="20" width="210" height="105" rx="12" class="table-box"/><path d="M307 20 H493 Q505 20 505 32 V62 H295 V32 Q295 20 307 20" class="table-head"/><text x="310" y="47" class="table-name">users</text><text x="490" y="47" class="table-subtitle" text-anchor="end">пользователи</text><text x="310" y="86" class="table-row">id</text><text x="310" y="111" class="table-row">email</text></g><g class="table-card"><rect x="15" y="175" width="300" height="230" rx="12" class="table-box"/><path d="M27 175 H303 Q315 175 315 187 V217 H15 V187 Q15 175 27 175" class="table-head"/><text x="30" y="202" class="table-name">contacts</text><text x="300" y="202" class="table-subtitle" text-anchor="end">контакты</text><text x="30" y="241" class="table-row">id — номер контакта</text><text x="30" y="266" class="table-row">owner_id — чей контакт</text><text x="30" y="291" class="table-row">name, about, phone, email</text><text x="30" y="316" class="table-row">contact_frequency, …</text><rect x="21" y="324" width="288" height="24" rx="4" class="new-row"/><text x="30" y="341" class="table-row">birth_day — день</text><rect x="21" y="349" width="288" height="24" rx="4" class="new-row"/><text x="30" y="366" class="table-row">birth_month — месяц</text><rect x="21" y="374" width="288" height="24" rx="4" class="new-row"/><text x="30" y="391" class="table-row">birth_year — год или пусто</text></g><g class="table-card"><rect x="500" y="175" width="280" height="130" rx="12" class="table-box"/><path d="M512 175 H768 Q780 175 780 187 V217 H500 V187 Q500 175 512 175" class="table-head"/><text x="515" y="202" class="table-name">groups</text><text x="765" y="202" class="table-subtitle" text-anchor="end">группы</text><text x="515" y="241" class="table-row">id</text><text x="515" y="266" class="table-row">owner_id — чья группа</text><text x="515" y="291" class="table-row">name</text></g><g class="table-card"><rect x="15" y="495" width="300" height="130" rx="12" class="table-box"/><path d="M27 495 H303 Q315 495 315 507 V537 H15 V507 Q15 495 27 495" class="table-head"/><text x="30" y="522" class="table-name">notes</text><text x="300" y="522" class="table-subtitle" text-anchor="end">заметки</text><text x="30" y="561" class="table-row">id, contact_id</text><text x="30" y="586" class="table-row">body — текст</text><text x="30" y="611" class="table-row">noted_on — дата общения</text></g><g class="table-card"><rect x="460" y="505" width="320" height="105" rx="12" class="table-box"/><path d="M472 505 H768 Q780 505 780 517 V547 H460 V517 Q460 505 472 505" class="table-head"/><text x="475" y="532" class="table-name">contact_groups</text><text x="765" y="532" class="table-subtitle" text-anchor="end">состав групп</text><text x="475" y="571" class="table-row">contact_id — контакт</text><text x="475" y="596" class="table-row">group_id — группа</text></g></svg></div><p class="caption">На узком экране схему можно листать вбок. Стрелки показывают связи между записями.</p></div>
+ <div class="callout highlight"><p><b>15 ноября без года</b> хранится как <code>birth_day = 15</code>, <code>birth_month = 11</code>, <code>birth_year = NULL</code>. <code>NULL</code> означает «не заполнено». Если даты нет вообще — пусты все три поля.</p></div>
+ <div class="subsection">
+  <h3>Как находятся свои и не находятся чужие</h3>
+  <p>У Анны Смирновой в базе владелец A, день рождения сегодня. Сервер ищет одновременно по ближайшей дате и по владельцу вошедшего пользователя.</p>
+  <div class="lookup"><div><h4>Вошёл пользователь A</h4><p>Найти ближайших именинников, у которых <code>owner_id = A</code>.</p><p class="result">Анна найдена → видна в блоке.</p></div><div><h4>Вошёл пользователь B</h4><p>Найти ближайших именинников, у которых <code>owner_id = B</code>.</p><p class="result">Анна не найдена → имя и дата не выданы.</p></div></div>
+ </div>
+ <div class="subsection">
+  <h3>Одна новая миграция</h3>
+  <p>Миграция — файл, который обновляет устройство базы перед запуском новой версии приложения. Пока этот файл только запланирован.</p>
+  <article class="migration"><span class="chip active">Добавление, без изменения прежних значений</span><h4 class="subsection">Поля даты рождения и проверка их сочетания</h4><ul><li>Добавит <code>birth_day</code>, <code>birth_month</code>, <code>birth_year</code>.</li><li>Разрешит пустую дату и дату без года; запретит неполную или невозможную дату.</li><li>У прежних контактов новые поля останутся пустыми.</li><li>Не будет извлекать даты из заметок, менять владельцев или удалять записи и связи.</li></ul></article>
+  <div class="callout"><h4>Как откатиться</h4><p>Вернуть предыдущую версию приложения вручную через Deploy prod. Новые пустые или заполненные поля остаются в базе: старое приложение их игнорирует. Удалять колонки и даты обратной миграцией не планируется. Выкатку на прод и откат запускаете вы.</p></div>
+ </div>
+</section>
+<section id="checks">
+ <h2><span class="section-number">04</span>Как проверить руками</h2>
+ <p>Каждый сценарий требований — отдельный пункт. Проверять приложение можно будет после реализации. Галочки ниже служат вашим временным списком и сбрасываются после перезагрузки этой страницы.</p>
+ <div class="callout"><p><b>Для особых случаев нужны условия.</b> Проверки с фиксированным «сегодня», прямым запросом серверу или миграцией выполняются на отдельной тестовой копии с агентом. Кнопка смены даты и способ прямого запроса в CRM не предусмотрены; порядок такого ручного запуска ещё не описан. Календарные границы запланированы и в автотестах.</p></div>
+ <div class="check-controls"><label>Показать: <select id="check-filter"><option value="all">Все 36 сценариев</option value="field">Поле и сохранение</option><option value="calendar">Границы периода</option><option value="screen">Главная страница</option><option value="date">Нужна заданная дата</option><option value="technical">Проверка с агентом</option><option value="access">Два пользователя</option></select></label><output class="check-progress" id="check-progress" aria-live="polite">Отмечено 0 из 36</output></div>
+ <div class="checklist"><article class="check-item" data-category="field" data-scenario="Новый контакт без даты рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Новый контакт без даты рождения"><span class="check-number">01</span><strong>Новый контакт без даты рождения</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>Открыть «Добавить контакт», заполнить имя и оставить дату рождения пустой.</li><li>Нажать «Добавить контакт», затем перезагрузить карточку.</li></ol><p class="expected"><b>Должно получиться:</b> Контакт сохранён. Дата пуста, в блоке именинников его нет.</p></div></article>
+<article class="check-item" data-category="field" data-scenario="Новый контакт без года рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Новый контакт без года рождения"><span class="check-number">02</span><strong>Новый контакт без года рождения</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>Создать контакт с датой 15 ноября, год оставить пустым.</li><li>Перезагрузить карточку.</li></ol><p class="expected"><b>Должно получиться:</b> Сохранены 15 и ноябрь. Поле года пустое.</p></div></article>
+<article class="check-item" data-category="field" data-scenario="Новый контакт с полной датой рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Новый контакт с полной датой рождения"><span class="check-number">03</span><strong>Новый контакт с полной датой рождения</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>Создать контакт с датой 29 февраля 2000 года.</li><li>Перезагрузить карточку.</li></ol><p class="expected"><b>Должно получиться:</b> Все три части даты сохранились: 29 февраля 2000 года.</p></div></article>
+<article class="check-item" data-category="date" data-scenario="Изменить день и месяц"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Изменить день и месяц"><span class="check-number">04</span><strong>Изменить день и месяц</strong></label><div class="check-body"><span class="tag">Нужна заданная дата</span><ol><li>При «сегодня = 15 ноября» открыть контакт с датой 20 ноября.</li><li>Изменить дату на 10 декабря, сохранить и открыть главную.</li></ol><p class="expected"><b>Должно получиться:</b> В карточке 10 декабря. Контакт исчез из ближайших именинников.</p></div></article>
+<article class="check-item" data-category="field" data-scenario="Добавить год"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Добавить год"><span class="check-number">05</span><strong>Добавить год</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>У контакта с датой 15 ноября без года вписать 1990.</li><li>Сохранить и перезагрузить карточку.</li></ol><p class="expected"><b>Должно получиться:</b> Сохранено 15 ноября 1990 года.</p></div></article>
+<article class="check-item" data-category="field" data-scenario="Убрать год"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Убрать год"><span class="check-number">06</span><strong>Убрать год</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>У контакта с датой 15 ноября 1990 года очистить только год.</li><li>Сохранить и перезагрузить карточку.</li></ol><p class="expected"><b>Должно получиться:</b> День и месяц остались, год пуст.</p></div></article>
+<article class="check-item" data-category="field" data-scenario="Полностью очистить дату"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Полностью очистить дату"><span class="check-number">07</span><strong>Полностью очистить дату</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>Открыть контакт, который виден в блоке именинников.</li><li>Очистить день, месяц и год, сохранить и открыть главную.</li></ol><p class="expected"><b>Должно получиться:</b> Дата пуста. Контакта больше нет в блоке именинников.</p></div></article>
+<article class="check-item" data-category="technical" data-scenario="Несуществующий день месяца"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Несуществующий день месяца"><span class="check-number">08</span><strong>Несуществующий день месяца</strong></label><div class="check-body"><span class="tag">Проверка с агентом</span><ol><li>На тестовой копии отправить форму с датой 31 апреля.</li><li>Если браузер запрещает такой ввод, проверить прямую отправку серверу с агентом.</li></ol><p class="expected"><b>Должно получиться:</b> Сохранение отклонено. Видна ошибка даты, введённое осталось, прежние данные не изменились.</p></div></article>
+<article class="check-item" data-category="technical" data-scenario="Невисокосный год рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Невисокосный год рождения"><span class="check-number">09</span><strong>Невисокосный год рождения</strong></label><div class="check-body"><span class="tag">Проверка с агентом</span><ol><li>Ввести 29 февраля 1991 года и отправить форму.</li><li>Если интерфейс блокирует ввод, проверить прямой запрос с агентом.</li></ol><p class="expected"><b>Должно получиться:</b> Сохранение отклонено. Ошибка даты видна, введённые значения остались.</p></div></article>
+<article class="check-item" data-category="field" data-scenario="29 февраля без года рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="29 февраля без года рождения"><span class="check-number">10</span><strong>29 февраля без года рождения</strong></label><div class="check-body"><span class="tag">Поле и сохранение</span><ol><li>Сохранить у контакта 29 февраля без года, в том числе в невисокосном текущем году.</li><li>Перезагрузить карточку.</li></ol><p class="expected"><b>Должно получиться:</b> 29 февраля сохранено, вымышленного года нет.</p></div></article>
+<article class="check-item" data-category="technical" data-scenario="Неполная дата рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Неполная дата рождения"><span class="check-number">11</span><strong>Неполная дата рождения</strong></label><div class="check-body"><span class="tag">Проверка с агентом</span><ol><li>По очереди попробовать сохранить только день, только месяц и только год.</li><li>Также проверить день с годом без месяца и месяц с годом без дня.</li></ol><p class="expected"><b>Должно получиться:</b> Каждый неполный вариант отклонён. Прежние данные сохранены.</p></div></article>
+<article class="check-item" data-category="technical" data-scenario="Некорректные значения частей даты"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Некорректные значения частей даты"><span class="check-number">12</span><strong>Некорректные значения частей даты</strong></label><div class="check-body"><span class="tag">Проверка с агентом</span><ol><li>На тестовой копии с агентом отправить в частях даты буквы, дробное число и число за календарными пределами, например месяц 13.</li><li>Проверить и создание, и редактирование контакта.</li></ol><p class="expected"><b>Должно получиться:</b> Видна ошибка «Укажите существующую дату рождения». Контакт не создаётся и не меняется.</p></div></article>
+<article class="check-item" data-category="calendar" data-scenario="День рождения сегодня"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="День рождения сегодня"><span class="check-number">13</span><strong>День рождения сегодня</strong></label><div class="check-body"><span class="tag">Границы периода</span><ol><li>Создать контакт с днём и месяцем сегодняшнего дня.</li><li>Открыть главную без поискового запроса.</li></ol><p class="expected"><b>Должно получиться:</b> Контакт виден в «Скоро день рождения».</p></div></article>
+<article class="check-item" data-category="calendar" data-scenario="День рождения через семь дней"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="День рождения через семь дней"><span class="check-number">14</span><strong>День рождения через семь дней</strong></label><div class="check-body"><span class="tag">Границы периода</span><ol><li>Создать контакт с датой ровно через 7 дней от московского сегодня.</li><li>Повторить с известным и неизвестным годом рождения.</li></ol><p class="expected"><b>Должно получиться:</b> Оба контакта видны в блоке: последняя граница включена.</p></div></article>
+<article class="check-item" data-category="calendar" data-scenario="День рождения через восемь дней"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="День рождения через восемь дней"><span class="check-number">15</span><strong>День рождения через восемь дней</strong></label><div class="check-body"><span class="tag">Границы периода</span><ol><li>Создать контакт с днём рождения через 8 дней.</li><li>Открыть главную без поиска.</li></ol><p class="expected"><b>Должно получиться:</b> Контакта в блоке нет.</p></div></article>
+<article class="check-item" data-category="calendar" data-scenario="День рождения уже прошёл"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="День рождения уже прошёл"><span class="check-number">16</span><strong>День рождения уже прошёл</strong></label><div class="check-body"><span class="tag">Границы периода</span><ol><li>Создать контакт со вчерашними днём и месяцем рождения.</li><li>Открыть главную без поиска.</li></ol><p class="expected"><b>Должно получиться:</b> Вчерашний именинник в блок не попадает.</p></div></article>
+<article class="check-item" data-category="date" data-scenario="Переход через Новый год"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Переход через Новый год"><span class="check-number">17</span><strong>Переход через Новый год</strong></label><div class="check-body"><span class="tag">Нужна заданная дата</span><ol><li>Проверять в тестовом запуске, где приложение считает сегодня 28 декабря 2026 года.</li><li>Создать контакты с датами 31 декабря и 4 января; открыть главную.</li></ol><p class="expected"><b>Должно получиться:</b> Видны оба: сначала 31 декабря 2026, затем 4 января 2027.</p></div></article>
+<article class="check-item" data-category="date" data-scenario="Смена дня по Москве"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Смена дня по Москве"><span class="check-number">18</span><strong>Смена дня по Москве</strong></label><div class="check-body"><span class="tag">Нужна заданная дата</span><ol><li>Проверять при времени 14 ноября 2026 года 21:30 UTC — в Москве уже 15 ноября.</li><li>Подготовить контакты с датами 14 и 22 ноября; открыть главную из другого часового пояса.</li></ol><p class="expected"><b>Должно получиться:</b> 14 ноября исключено, 22 ноября включено. Решает московская дата.</p></div></article>
+<article class="check-item" data-category="date" data-scenario="29 февраля в невисокосный год"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="29 февраля в невисокосный год"><span class="check-number">19</span><strong>29 февраля в невисокосный год</strong></label><div class="check-body"><span class="tag">Нужна заданная дата</span><ol><li>Проверять при «сегодня = 28 февраля 2027 года».</li><li>Подготовить контакт с рождением 29 февраля, открыть главную и его карточку.</li></ol><p class="expected"><b>Должно получиться:</b> В блоке «28 февраля». В карточке по-прежнему 29 февраля. Повторить с годом и без года рождения.</p></div></article>
+<article class="check-item" data-category="date" data-scenario="29 февраля в високосный год"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="29 февраля в високосный год"><span class="check-number">20</span><strong>29 февраля в високосный год</strong></label><div class="check-body"><span class="tag">Нужна заданная дата</span><ol><li>Проверять при «сегодня = 28 февраля 2028 года».</li><li>Подготовить контакт с рождением 29 февраля, открыть главную и его карточку.</li></ol><p class="expected"><b>Должно получиться:</b> В блоке «29 февраля». В карточке по-прежнему 29 февраля. Повторить с годом и без года рождения.</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Нет контактов"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Нет контактов"><span class="check-number">21</span><strong>Нет контактов</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>Войти новым тестовым пользователем без контактов.</li><li>Открыть главную.</li></ol><p class="expected"><b>Должно получиться:</b> Блока дней рождения нет. Видна подсказка «Добавь первый контакт».</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Нет ближайших дней рождения"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Нет ближайших дней рождения"><span class="check-number">22</span><strong>Нет ближайших дней рождения</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>У тестового пользователя оставить контакты без дат или с датами за пределами ближайших 7 дней.</li><li>Открыть главную без поиска.</li></ol><p class="expected"><b>Должно получиться:</b> Нет ни заголовка «Скоро день рождения», ни пустого блока.</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Блок скрывается при поиске"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Блок скрывается при поиске"><span class="check-number">23</span><strong>Блок скрывается при поиске</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>Подготовить ближайшего именинника и убедиться, что блок виден.</li><li>Ввести имя или группу в поиск.</li></ol><p class="expected"><b>Должно получиться:</b> Блок скрыт. Общий список показывает результаты поиска.</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Блок возвращается после поиска"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Блок возвращается после поиска"><span class="check-number">24</span><strong>Блок возвращается после поиска</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>При наличии ближайшего именинника начать поиск.</li><li>Сбросить поисковый запрос.</li></ol><p class="expected"><b>Должно получиться:</b> Блок снова виден над «Пора связаться».</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Именинник вне выбранной группы"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Именинник вне выбранной группы"><span class="check-number">25</span><strong>Именинник вне выбранной группы</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>Подготовить ближайшего именинника, который не входит в «Теннис».</li><li>Выбрать фильтр «Теннис».</li></ol><p class="expected"><b>Должно получиться:</b> В блоке именинник есть. В общем списке группы его нет.</p></div></article>
+<article class="check-item" data-category="date" data-scenario="Ближайшие сверху"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Ближайшие сверху"><span class="check-number">26</span><strong>Ближайшие сверху</strong></label><div class="check-body"><span class="tag">Нужна заданная дата</span><ol><li>При «сегодня = 15 ноября» подготовить Анну с 20 ноября, Бориса с 15 ноября и Веру с 17 ноября.</li><li>Открыть главную без поиска.</li></ol><p class="expected"><b>Должно получиться:</b> Порядок: Борис, Вера, Анна.</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Одинаковая дата"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Одинаковая дата"><span class="check-number">27</span><strong>Одинаковая дата</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>Подготовить Анну и Веру с одной ближайшей датой.</li><li>Открыть главную без поиска.</li></ol><p class="expected"><b>Должно получиться:</b> Анна выше Веры.</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Имя и дата со ссылкой на карточку"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Имя и дата со ссылкой на карточку"><span class="check-number">28</span><strong>Имя и дата со ссылкой на карточку</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>Когда 20 ноября входит в ближайший период, открыть блок с Анной Смирновой, родившейся 20 ноября 1990 года.</li><li>Проверить строку и нажать на имя.</li></ol><p class="expected"><b>Должно получиться:</b> Видны имя и «20 ноября», без года и возраста. Открывается карточка Анны.</p></div></article>
+<article class="check-item" data-category="screen" data-scenario="Контакт в обоих блоках"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Контакт в обоих блоках"><span class="check-number">29</span><strong>Контакт в обоих блоках</strong></label><div class="check-body"><span class="tag">Главная страница</span><ol><li>Подготовить ближайшего именинника с наступившим сроком общения.</li><li>Открыть главную без поиска.</li></ol><p class="expected"><b>Должно получиться:</b> Контакт есть в обоих блоках. «Скоро день рождения» стоит выше «Пора связаться».</p></div></article>
+<article class="check-item" data-category="technical" data-scenario="Обновление базы с контактами"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Обновление базы с контактами"><span class="check-number">30</span><strong>Обновление базы с контактами</strong></label><div class="check-body"><span class="tag">Проверка с агентом</span><ol><li>В отдельной тестовой копии до обновления записать число контактов, заметок, групп и связей; проверить примеры их содержимого.</li><li>После реализации попросить агента применить новую миграцию к этой копии и сравнить данные.</li></ol><p class="expected"><b>Должно получиться:</b> Прежние записи и связи сохранились. Даты рождения пусты, случайных именинников нет.</p></div></article>
+<article class="check-item" data-category="access" data-scenario="Чужой контакт в списке"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Чужой контакт в списке"><span class="check-number">31</span><strong>Чужой контакт в списке</strong></label><div class="check-body"><span class="tag">Два пользователя</span><ol><li>В тестовом аккаунте A создать «Вера Лебедева».</li><li>Войти как B в другом браузере и открыть главную.</li></ol><p class="expected"><b>Должно получиться:</b> В списке B нет Веры, счётчик её не учитывает.</p></div></article>
+<article class="check-item" data-category="access" data-scenario="Чужой контакт в поиске"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Чужой контакт в поиске"><span class="check-number">32</span><strong>Чужой контакт в поиске</strong></label><div class="check-body"><span class="tag">Два пользователя</span><ol><li>Оставить «Вера Лебедева» только у пользователя A.</li><li>В аккаунте B поискать «Лебедева».</li></ol><p class="expected"><b>Должно получиться:</b> B видит «Никого не нашли».</p></div></article>
+<article class="check-item" data-category="access" data-scenario="Чужой контакт в «Пора связаться»"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Чужой контакт в «Пора связаться»"><span class="check-number">33</span><strong>Чужой контакт в «Пора связаться»</strong></label><div class="check-body"><span class="tag">Два пользователя</span><ol><li>У контакта пользователя A подготовить просроченный срок общения.</li><li>Открыть главную под B.</li></ol><p class="expected"><b>Должно получиться:</b> Чужого контакта в «Пора связаться» у B нет.</p></div></article>
+<article class="check-item" data-category="access" data-scenario="Чужие группы"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Чужие группы"><span class="check-number">34</span><strong>Чужие группы</strong></label><div class="check-body"><span class="tag">Два пользователя</span><ol><li>У A создать «Теннис», а у B оставить группы пустыми.</li><li>Под B открыть страницу групп, фильтр и поле групп в форме контакта.</li></ol><p class="expected"><b>Должно получиться:</b> Чужой «Теннис» нигде не показан. В местах с пустыми группами — «Групп пока нет».</p></div></article>
+<article class="check-item" data-category="access" data-scenario="Чужая группа в адресе фильтра"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Чужая группа в адресе фильтра"><span class="check-number">35</span><strong>Чужая группа в адресе фильтра</strong></label><div class="check-body"><span class="tag">Два пользователя</span><ol><li>Под A открыть фильтр «Теннис» и скопировать адрес страницы.</li><li>Открыть этот адрес под B.</li></ol><p class="expected"><b>Должно получиться:</b> У B выбрано «Все группы». Видны только его контакты.</p></div></article>
+<article class="check-item" data-category="access" data-scenario="Чужой контакт в «Скоро день рождения»"><label class="check-title"><input type="checkbox" class="scenario-check" aria-label="Чужой контакт в «Скоро день рождения»"><span class="check-number">36</span><strong>Чужой контакт в «Скоро день рождения»</strong></label><div class="check-body"><span class="tag">Два пользователя</span><ol><li>Под A создать контакт с сегодняшним днём рождения.</li><li>Открыть главную под B.</li></ol><p class="expected"><b>Должно получиться:</b> Имя и дата чужого контакта не показаны в блоке B.</p></div></article></div>
+ <p class="caption">Пункты 31–35 сохраняют прежние требования доступа. Пункт 36 добавляет проверку нового блока. Новые и прежние проверки в плане не ослабляются.</p>
+</section>
+<section id="decisions">
+ <h2><span class="section-number">05</span>Что агент решил сам</h2>
+ <div class="panel">
+  <h3>Продуктовые детали — стоит просмотреть</h3>
+  <ul class="decision-list"><li>Предложил ввод тремя частями: день, месяц и необязательный год. Точное расположение полей отдельно не согласовывали; экран выше — набросок.</li><li>Добавил возможность менять и полностью очищать дату, в том числе убирать только год.</li><li>Задал текст ошибки: «Укажите существующую дату рождения», с сохранением введённых значений.</li><li>Применил московскую дату, как в существующем блоке «Пора связаться».</li><li>Оставил обновление списка при загрузке страницы, без автоматического пересчёта открытой вкладки в полночь.</li></ul>
+ </div>
+ <div class="decision-section panel">
+  <h3>Ранее предложено агентом, затем подтверждено вами</h3>
+  <p>Блок над «Пора связаться»; в строке имя-ссылка и день с месяцем; при одинаковой дате — по имени; пустой блок и блок при поиске скрыты; фильтр группы не влияет. Эти правила не считаются неподтверждёнными решениями агента.</p>
+ </div>
+ <div class="decision-section panel">
+  <h3>Технические решения — как это будет устроено</h3>
+  <ul class="decision-list"><li>Три числовых поля в таблице контактов, неизвестный год остаётся пустым. Отдельная таблица дней рождения не нужна.</li><li>Сервер проверяет дату и выбирает совпадения среди восьми календарных дней. Браузер напрямую к базе не обращается.</li><li>Условие владельца обязательно в запросе; сортировка имён такая же, как в общем списке.</li><li>Используются нынешние библиотеки, формы, стили и процесс выкатки. Новых сервисов нет.</li><li>Миграция добавляет поля, а при откате версии поля остаются в базе.</li></ul>
+ </div>
+</section>
+<section id="questions">
+ <h2><span class="section-number">06</span>Что осталось неясным</h2>
+ <div class="panel prose">
+  <h3>Полная дата рождения в будущем</h3>
+  <p>Требования требуют существующую календарную дату, но не говорят, нужно ли отклонять дату рождения позже сегодняшнего дня. Правило не добавлялось; его можно уточнить отдельно.</p>
+  <h3 class="subsection">Как вручную воспроизводить специальные даты</h3>
+  <p>В плане есть автотесты на Новый год, високосность и московскую полночь. Инструкция для ручного запуска приложения с фиксированным временем и отправки некорректной даты напрямую серверу пока не описана.</p>
+  <p class="muted">Год рождения, границы периода, правило 29 февраля и поведение блока уже согласованы. Дополнительных решений для создания этого обзора не принималось.</p>
+ </div>
+</section>
+</main>
+<footer><p>Источник: документы изменения <code>openspec/changes/birthdays/</code>. Это обзор плана, не отчёт о готовой реализации.</p><p>Оформление: токены приложения из <code>src/app/globals.css</code>, шрифты Manrope и Unbounded. Самостоятельный HTML, внешние ресурсы — только шрифты.</p></footer>
+</div>
+<script>
+/* Checklist state belongs only to this overview and is never sent anywhere. */
+(function () {
+ var boxes = Array.from(document.querySelectorAll('.scenario-check'));
+ var output = document.getElementById('check-progress');
+ function updateProgress() {
+  output.textContent = 'Отмечено ' + boxes.filter(function (box) { return box.checked; }).length + ' из ' + boxes.length;
+ }
+ boxes.forEach(function (box) { box.addEventListener('change', updateProgress); });
+ document.getElementById('check-filter').addEventListener('change', function (event) {
+  var category = event.target.value;
+  document.querySelectorAll('.check-item').forEach(function (item) {
+   item.hidden = category !== 'all' && item.dataset.category !== category;
+  });
+ });
+ updateProgress();
+}());
+</script>
+</body>
+</html>
+

@@ -162,6 +162,39 @@ export async function listOverdueContacts(ownerId: string) {
     );
 }
 
+export async function listUpcomingBirthdays(ownerId: string) {
+  const days = sql`(select ${todayInAppTimeZone()}::date + day_offset as day
+    from generate_series(0, 7) as offsets(day_offset)) birthday_days`;
+  return db
+    .select({
+      id: contacts.id,
+      name: contacts.name,
+      birthdayOn: sql<string>`to_char(birthday_days.day, 'YYYY-MM-DD')`,
+    })
+    .from(contacts)
+    .innerJoin(
+      days,
+      sql`
+      ${contacts.birthMonth} = extract(month from birthday_days.day)
+      and extract(day from birthday_days.day) = case
+        when ${contacts.birthMonth} = 2 and ${contacts.birthDay} = 29
+          then extract(day from date_trunc('month', birthday_days.day) + interval '1 month - 1 day')
+        else ${contacts.birthDay} end`,
+    )
+    .where(
+      and(
+        eq(contacts.ownerId, ownerId),
+        isNotNull(contacts.birthDay),
+        isNotNull(contacts.birthMonth),
+      ),
+    )
+    .orderBy(
+      sql`birthday_days.day`,
+      sql`${contacts.name} collate "ru-x-icu"`,
+      asc(contacts.id),
+    );
+}
+
 export async function getContact(ownerId: string, id: number) {
   const [contact] = await db
     .select({
@@ -171,6 +204,9 @@ export async function getContact(ownerId: string, id: number) {
       howWeMet: contacts.howWeMet,
       phone: contacts.phone,
       email: contacts.email,
+      birthDay: contacts.birthDay,
+      birthMonth: contacts.birthMonth,
+      birthYear: contacts.birthYear,
       frequency: contacts.contactFrequency,
       lastContactOn,
       dueOn,

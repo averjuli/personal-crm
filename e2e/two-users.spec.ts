@@ -7,6 +7,7 @@ import { expect, newBrowserContext, test } from "./fixtures";
 import { uniqueEmail } from "./mailpit";
 import { signIn } from "./sign-in";
 import { signedOut } from "./test-user";
+import { todayInAppTimeZone } from "@/lib/keep-in-touch";
 
 // Nobody is signed in at the start: each user signs in by the link
 test.use({ storageState: signedOut });
@@ -69,6 +70,50 @@ async function expectNoTraceOf(
     await expect(page.getByText(other.name)).toHaveCount(0);
   });
 }
+
+test("upcoming birthdays belong only to the signed-in user", async ({
+  browser,
+  baseURL,
+}) => {
+  const a = await openBrowserOf(
+    browser,
+    baseURL,
+    uniqueEmail("birthday-owner"),
+  );
+  const b = await openBrowserOf(
+    browser,
+    baseURL,
+    uniqueEmail("birthday-other"),
+  );
+  try {
+    await addContact(a.page, "Чужой именинник");
+    const today = new Date(`${todayInAppTimeZone()}T00:00:00Z`);
+    await a.page
+      .getByLabel("День рождения", { exact: true })
+      .fill(String(today.getUTCDate()));
+    await a.page
+      .getByLabel("Месяц рождения", { exact: true })
+      .fill(String(today.getUTCMonth() + 1));
+    await a.page
+      .getByRole("button", { name: "Сохранить", exact: true })
+      .click();
+    await expect(a.page.getByText("Изменения сохранены")).toBeVisible();
+    await a.page.goto("/");
+    await expect(
+      a.page
+        .getByRole("region", { name: "Скоро день рождения" })
+        .getByRole("link", { name: "Чужой именинник" }),
+    ).toBeVisible();
+    await b.page.goto("/");
+    await expect(
+      b.page.getByRole("region", { name: "Скоро день рождения" }),
+    ).toHaveCount(0);
+    await expect(b.page.getByText("Чужой именинник")).toHaveCount(0);
+  } finally {
+    await a.context.close();
+    await b.context.close();
+  }
+});
 
 test("two users do not see each other's contacts", async ({
   browser,
