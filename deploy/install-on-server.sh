@@ -214,12 +214,12 @@ else
   # Containers and network only: the volume personal-crm_db-data stays as one more copy
   docker compose -p personal-crm down
   rm -f "$APP_DIR/compose.yaml"
-  /usr/local/sbin/crm-deploy deploy "$current" </dev/null
+  /usr/local/sbin/crm-deploy deploy prod "$current" </dev/null
   docker image rm personal-crm-app:latest >/dev/null
   docker image rm personal-crm-app:previous >/dev/null 2>&1 || true
 fi
 
 step "Check"
-/usr/local/sbin/crm-deploy status
+/usr/local/sbin/crm-deploy status prod
 echo
 echo "ALL DONE"
