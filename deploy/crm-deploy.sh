@@ -149,11 +149,19 @@ deploy() {
   fi
 
   # The first staging deploy starts from the most recent production backup.
-  if [ "$DEPLOY_ENV" = staging ] && ! docker volume inspect staging_db-data >/dev/null 2>&1; then
-    local initial_backup
-    initial_backup=$(latest_prod_backup)
-    step "Initializing staging from $initial_backup"
-    load_prod_backup_into_staging "$initial_backup"
+  # A failed initial import leaves an empty volume, so retry it on the next deploy.
+  if [ "$DEPLOY_ENV" = staging ]; then
+    local staging_tables initial_backup
+    if ! docker volume inspect staging_db-data >/dev/null 2>&1; then
+      staging_tables=0
+    else
+      staging_tables=$(staging_table_count)
+    fi
+    if [ "$staging_tables" -eq 0 ]; then
+      initial_backup=$(latest_prod_backup)
+      step "Initializing staging from $initial_backup"
+      load_prod_backup_into_staging "$initial_backup"
+    fi
   fi
 
   # Only production takes a backup before migrations.
@@ -307,23 +315,33 @@ latest_prod_backup() {
 }
 
 load_prod_backup_into_staging() {
-  local file=$1
+  local file=$1 replace=${2:-no}
   select_environment staging
   mkdir -p "$ENV_DIR"
   compose up -d --wait db
-  gunzip -c "$file" | compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 --single-transaction -q -o /dev/null'
-  echo "Loaded $(basename "$file") into staging"
+  if [ "$replace" = yes ]; then
+    compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -q -c "DROP DATABASE \"$POSTGRES_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$POSTGRES_DB\""' </dev/null
+  fi
+  gunzip -c "$file" \
+    | sed -E '/^ALTER .* OWNER TO /d' \
+    | compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 --single-transaction -q -o /dev/null'
+  echo "Loaded $(basename "$file") into staging; objects are owned by the staging database user"
+}
+
+staging_table_count() {
+  compose up -d --wait db >/dev/null
+  compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -qAt -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema()"' </dev/null
 }
 
 staging_init() {
   local file
   select_environment staging
-  if docker volume inspect staging_db-data >/dev/null 2>&1; then
-    die "staging database volume already exists; use staging-refresh to replace its data"
+  if docker volume inspect staging_db-data >/dev/null 2>&1 && [ "$(staging_table_count)" -ne 0 ]; then
+    die "staging database already has tables; use staging-refresh to replace its data"
   fi
   file=$(latest_prod_backup)
   echo "Initializing the empty staging database from $file"
-  load_prod_backup_into_staging "$file"
+  load_prod_backup_into_staging "$file" yes
 }
 
 staging_refresh() {
@@ -336,7 +354,7 @@ staging_refresh() {
   IFS= read -r answer || answer=""
   [ "$answer" = yes ] || die "cancelled, nothing changed"
   compose stop app || true
-  load_prod_backup_into_staging "$file"
+  load_prod_backup_into_staging "$file" yes
   local version
   version=$(current_version)
   [ -n "$version" ] || die "staging has no deployed version; database copy is ready"
