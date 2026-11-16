@@ -11,7 +11,8 @@
 #                            one per line
 #   crm-deploy rollback <environment>  start the previous version again; manual only
 #   crm-deploy status <environment>    containers, current and previous versions, health
-#   crm-deploy logs <environment>      last 200 lines of the app log
+#   crm-deploy logs <environment> [app|db]  last 200 journal lines, including replaced containers
+#   crm-deploy verify-logs staging     recreate only the staging app and verify journal retention
 #   crm-deploy backup prod [daily]     dump the production database
 #   crm-deploy setup-backups           install and enable the daily backup timer
 #   crm-deploy restore prod [file]     replace the production database after typing "yes";
@@ -247,9 +248,61 @@ rollback() {
 
 status() {
   compose ps -a || true
+  local service container
+  for service in app db; do
+    container=$(compose ps -q "$service")
+    if [ -n "$container" ]; then
+      docker inspect -f '{{.Name}} logging={{.HostConfig.LogConfig.Type}}' "$container"
+    fi
+  done
   echo "current:  $(current_version)"
   echo "previous: $(previous_version)"
   echo "health:   $(curl -fsS --max-time 5 "http://127.0.0.1:$APP_PORT/health" || echo unavailable)"
+}
+
+logs() {
+  local service=${1:-app}
+  case "$service" in app|db) ;; *) die "log service must be app or db" ;; esac
+  # A stable name matches all generations; compose logs only reads the current container.
+  journalctl --quiet --no-pager -n 200 -o short-iso-precise "CONTAINER_NAME=$DEPLOY_ENV-$service-1"
+}
+
+verify_logs() {
+  [ "$DEPLOY_ENV" = staging ] || die "log retention verification is staging-only"
+  local service container before after database cutoff entry retained new_entry
+  for service in app db; do
+    container=$(compose ps -q "$service")
+    [ -n "$container" ] || die "staging $service is not running"
+    [ "$(docker inspect -f '{{.HostConfig.LogConfig.Type}}' "$container")" = journald ] \
+      || die "staging $service is not using journald"
+  done
+  before=$(compose ps -q app)
+  database=$(compose ps -q db)
+  journalctl --sync
+  cutoff=$(date --iso-8601=ns)
+  entry=$(journalctl --quiet --no-pager -n 200 -o export --until "$cutoff" \
+    CONTAINER_NAME=staging-app-1 "CONTAINER_ID_FULL=$before")
+  [ -n "$entry" ] || die "no journal entry found for the current staging app"
+
+  step "Recreating only the staging app; database and production stay running"
+  compose up -d --no-deps --force-recreate --wait --wait-timeout 120 app \
+    || die "staging app did not become healthy; nothing was rolled back"
+  after=$(compose ps -q app)
+  [ -n "$after" ] && [ "$before" != "$after" ] || die "staging app was not recreated"
+  [ "$(compose ps -q db)" = "$database" ] || die "staging database container changed"
+  journalctl --sync
+  retained=$(journalctl --quiet --no-pager -n 200 -o export --until "$cutoff" \
+    CONTAINER_NAME=staging-app-1 "CONTAINER_ID_FULL=$before")
+  [ "$entry" = "$retained" ] || die "the old staging app journal entries were not preserved"
+  new_entry=$(journalctl --quiet --no-pager -n 1 -o export \
+    CONTAINER_NAME=staging-app-1 "CONTAINER_ID_FULL=$after")
+  [ -n "$new_entry" ] || die "no journal entry found for the recreated staging app"
+  smoke "$(current_version)" || die "staging smoke test failed; nothing was rolled back"
+  echo "Old container: $before"
+  echo "New container: $after"
+  echo "Preserved journal entries SHA256: $(printf '%s' "$entry" | sha256sum | cut -d ' ' -f1)"
+  journalctl --disk-usage
+  step "Old journal entries preserved exactly; new container logs are present; staging is healthy"
 }
 
 # Name: <prefix>-<date>-<time>-<version running now>.sql.gz; the path goes to LAST_BACKUP
@@ -546,7 +599,7 @@ case "${1:-}" in
     flock -x -w 600 9 || die "another deployment is using or updating deploy scripts"
     upload
     ;;
-  deploy|rollback|status|logs|backup|restore|seed|staging-init|staging-refresh)
+  deploy|rollback|status|logs|verify-logs|backup|restore|seed|staging-init|staging-refresh)
     select_environment "${2:-}"
     mkdir -p "$ENV_DIR"
     exec 8>/run/crm-deploy-code.lock
@@ -563,7 +616,8 @@ case "${1:-}" in
       deploy) deploy "$DEPLOY_ENV" "${3:-}" ;;
       rollback) rollback "$DEPLOY_ENV" ;;
       status) status ;;
-      logs) compose logs --tail 200 app ;;
+      logs) logs "${3:-app}" ;;
+      verify-logs) verify_logs ;;
       backup) backup "${3:-prod}" ;;
       restore) restore "${3:-}" ;;
       seed) compose run --rm app node scripts/seed.mjs ;;
@@ -577,5 +631,5 @@ case "${1:-}" in
     flock -x -w 600 8 || die "deploy scripts are in use"
     setup_backups
     ;;
-  *) die "usage: crm-deploy upload | deploy <prod|staging> <sha> | rollback <prod|staging> | status <prod|staging> | logs <prod|staging> | backup prod [daily] | restore prod [file] | staging-init staging | staging-refresh staging | setup-staging | setup-backups | seed <prod|staging>" ;;
+  *) die "usage: crm-deploy upload | deploy <prod|staging> <sha> | rollback <prod|staging> | status <prod|staging> | logs <prod|staging> [app|db] | verify-logs staging | backup prod [daily] | restore prod [file] | staging-init staging | staging-refresh staging | setup-staging | setup-backups | seed <prod|staging>" ;;
 esac
