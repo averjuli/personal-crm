@@ -48,9 +48,9 @@ def select_version():
     if requested and not SHA_PATTERN.fullmatch(requested):
         raise ValueError("Enter a full, lowercase, 40-character commit SHA")
 
-    parameters = {"branch": "main", "status": "completed"}
-    if requested:
-        parameters["head_sha"] = requested
+    # GitHub's status filter can omit recent completed runs. Fetch the branch
+    # history and validate status and the requested SHA locally.
+    parameters = {"branch": "main"}
     runs_path = f"repos/{REPOSITORY}/actions/workflows/deploy.yml/runs?{urlencode(parameters)}"
     deployments = []
     runs = sorted(
@@ -62,6 +62,8 @@ def select_version():
         # contain a newer success once this bound falls below the best result.
         if deployments and run["updated_at"] < max(deployments)[0]:
             break
+        if run["status"] != "completed":
+            continue
         if run["event"] not in ("push", "workflow_dispatch"):
             continue
         if requested and run["head_sha"] != requested:
