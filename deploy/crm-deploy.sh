@@ -279,7 +279,7 @@ verify_logs() {
   before=$(compose ps -q app)
   database=$(compose ps -q db)
   journalctl --sync
-  cutoff=$(date --iso-8601=ns)
+  cutoff=$(date --utc '+%Y-%m-%d %H:%M:%S.%6N UTC')
   entry=$(journalctl --quiet --no-pager -n 200 -o export --until "$cutoff" \
     CONTAINER_NAME=staging-app-1 "CONTAINER_ID_FULL=$before")
   [ -n "$entry" ] || die "no journal entry found for the current staging app"
