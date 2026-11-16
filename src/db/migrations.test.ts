@@ -48,6 +48,38 @@ afterAll(async () => {
 });
 
 describe("migration 0003", () => {
+  it("preserves existing records and leaves birthdays empty after the update", async () => {
+    const snapshot = async () => {
+      const [contactRows, noteRows, groupRows, links] = await Promise.all([
+        client`select to_jsonb(c) - 'owner_id' - 'birth_day' - 'birth_month' - 'birth_year' as data from contacts c order by id`,
+        client`select * from notes order by id`,
+        client`select to_jsonb(g) - 'owner_id' as data from "groups" g order by id`,
+        client`select * from contact_groups order by contact_id, group_id`,
+      ]);
+      return {
+        contacts: [...contactRows],
+        notes: [...noteRows],
+        groups: [...groupRows],
+        links: [...links],
+      };
+    };
+    const before = await snapshot();
+
+    await applyMigrations(client, OWNER);
+
+    expect(await snapshot()).toEqual(before);
+    expect(await counts()).toEqual(LEGACY_COUNTS);
+    const birthdays =
+      await client`select birth_day, birth_month, birth_year from contacts order by id`;
+    expect([...birthdays]).toEqual(
+      Array.from({ length: LEGACY_COUNTS.contacts }, () => ({
+        birth_day: null,
+        birth_month: null,
+        birth_year: null,
+      })),
+    );
+  });
+
   it("«Данные после обновления»: moves everything to the owner, loses nothing", async () => {
     const before = await counts();
     expect(before).toEqual(LEGACY_COUNTS);

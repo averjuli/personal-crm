@@ -39,6 +39,9 @@ const emptyValues: ContactFormValues = {
   howWeMet: "",
   phone: "",
   email: "",
+  birthDay: "",
+  birthMonth: "",
+  birthYear: "",
   frequency: "",
   note: "",
   groupIds: [],
@@ -117,6 +120,36 @@ export function ContactForm({ groups, contact }: ContactFormProps) {
           placeholder="anna@example.com"
         />
       </div>
+      <fieldset
+        className="grid gap-2.5"
+        aria-describedby={errorFor("birthDay") ? "birthDay-error" : undefined}
+      >
+        <legend className="mb-2 text-sm font-semibold">Дата рождения</legend>
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <Field
+            name="birthDay"
+            label="День рождения"
+            inputMode="numeric"
+            defaultValue={values.birthDay}
+            error={errorFor("birthDay")}
+            placeholder="Например: 15"
+          />
+          <Field
+            name="birthMonth"
+            label="Месяц рождения"
+            inputMode="numeric"
+            defaultValue={values.birthMonth}
+            placeholder="От 1 до 12"
+          />
+          <Field
+            name="birthYear"
+            label="Год рождения (необязательно)"
+            inputMode="numeric"
+            defaultValue={values.birthYear}
+            placeholder="Например: 1990"
+          />
+        </div>
+      </fieldset>
       <FrequencyField
         defaultValue={values.frequency}
         error={errorFor("frequency")}
@@ -177,6 +210,7 @@ type FieldProps = {
   error?: string;
   required?: boolean;
   type?: "text" | "tel" | "email";
+  inputMode?: "numeric";
   // Multi-line text area instead of a single-line input
   multiline?: boolean;
   placeholder?: string;
@@ -196,6 +230,7 @@ function Field({
   error,
   required,
   type = "text",
+  inputMode,
   multiline,
   placeholder,
 }: FieldProps) {
@@ -205,6 +240,7 @@ function Field({
     name,
     defaultValue,
     placeholder,
+    inputMode,
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? errorId : undefined,
   };

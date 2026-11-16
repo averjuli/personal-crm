@@ -18,6 +18,7 @@ import {
   listGroups,
   listNotes,
   listOverdueContacts,
+  listUpcomingBirthdays,
   markKeepInTouch,
   renameGroup,
   undoKeepInTouch,
@@ -39,6 +40,9 @@ function input(name: string, groupIds: number[] = []) {
     howWeMet: null,
     phone: null,
     email: null,
+    birthDay: null,
+    birthMonth: null,
+    birthYear: null,
     frequency: null,
     note: null,
     groupIds,
@@ -92,6 +96,28 @@ describe("owner of new records", () => {
 });
 
 describe("B sees nothing of A", () => {
+  it("does not reveal another owner's upcoming birthday", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-11-15T12:00:00+03:00"));
+      await createContact(a, {
+        ...input("Вера"),
+        birthDay: 15,
+        birthMonth: 11,
+      });
+      const own = await createContact(b, {
+        ...input("Анна"),
+        birthDay: 15,
+        birthMonth: 11,
+      });
+      expect(await listUpcomingBirthdays(b)).toEqual([
+        { id: own, name: "Анна", birthdayOn: "2026-11-15" },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("«Чужой контакт в списке»", async () => {
     await createContact(a, input("Вера Лебедева"));
     await createContact(b, input("Глеб Орлов"));
@@ -171,10 +197,20 @@ describe("B cannot read or change records of A", () => {
         ...input("Вера Лебедева"),
         frequency: "week",
         note: "Кофе",
+        birthDay: 15,
+        birthMonth: 11,
+        birthYear: 1990,
       });
       const before = await cardOf(a, id);
 
-      expect(await updateContact(b, id, input("Взломана"))).toBe(false);
+      const foreignInput = {
+        ...input("Взломана"),
+        birthDay: 1,
+        birthMonth: 1,
+        birthYear: 2000,
+      };
+      expect(await updateContact(b, id, foreignInput)).toBe(false);
+      expect(await updateContact(b, id + 1000, foreignInput)).toBe(false);
       expect(await markKeepInTouch(b, id, "contacted")).toBeNull();
       expect(await markKeepInTouch(b, id, "skipped")).toBeNull();
       // The same answer as for a contact that does not exist
@@ -187,6 +223,11 @@ describe("B cannot read or change records of A", () => {
 
       const after = await cardOf(a, id);
       expect(after.contact!.name).toBe("Вера Лебедева");
+      expect(after.contact).toMatchObject({
+        birthDay: 15,
+        birthMonth: 11,
+        birthYear: 1990,
+      });
       expect(after.contact!.lastContactOn).toBe("2026-10-24");
       expect(after.notes).toEqual(before.notes);
       expect(after.list).toEqual(["Вера Лебедева"]);
