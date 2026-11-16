@@ -156,14 +156,40 @@ Mailpit — «почтовая заглушка»: приложение отпр
 | Команда | Что делает |
 | --- | --- |
 | `ssh crm sudo crm-deploy status prod` | Показывает, что запущено, текущую и предыдущую версии prod и отвечает ли приложение |
-| `ssh crm sudo crm-deploy logs prod` | Последние 200 строк журнала приложения prod |
+| `ssh crm sudo crm-deploy logs prod` | Последние 200 строк журнала приложения prod, включая прежние контейнеры |
+| `ssh crm sudo crm-deploy logs staging` | Последние 200 строк журнала приложения стенда, включая прежние контейнеры |
+| `ssh crm sudo crm-deploy logs prod db` | Последние 200 строк журнала базы prod (для стенда замените `prod` на `staging`) |
+| `ssh crm sudo crm-deploy verify-logs staging` | Пересоздаёт только приложение стенда и проверяет сохранность старых записей, появление новых логов и `/health` |
 | `ssh crm sudo crm-deploy backup prod` | Сохраняет копию базы prod в `/var/backups/personal-crm` на сервере |
 | `ssh crm sudo crm-deploy backup prod daily` | Сохраняет копию в ежедневную серию бэкапов, например для ручной проверки |
 | `ssh crm sudo crm-deploy restore prod` | Показывает список копий базы prod, из которых можно восстановиться |
 | `ssh -t crm sudo crm-deploy restore prod <файл>` | Заменяет базу prod копией из файла, см. «Восстановление из бэкапа» |
 | `ssh crm sudo crm-deploy seed prod` | Заполняет **пустую** базу prod тестовыми контактами |
 
-Логи контейнеров лежат в системном журнале `journald`, размер ограничивает система. Ошибки запросов к базе есть только в журнале приложения, без значений запроса: сама Postgres их в свой журнал не пишет.
+### Как читать логи
+
+Логи приложения и базы обоих окружений Docker отправляет в системный журнал `journald`. Они сохраняются после пересоздания контейнера, выкатки и отката, пока не достигнут предел хранения журнала. Размер ограничивает сам `systemd-journald`: он удаляет старые архивные файлы журнала и оставляет свободное место на диске согласно системным настройкам `SystemMaxUse`, `SystemKeepFree` (для журнала в памяти — `RuntimeMaxUse`, `RuntimeKeepFree`). Общие настройки журнала и Docker на сервере выкатка не меняет.
+
+Команды `crm-deploy logs` из таблицы работают без пароля sudo и читают историю по постоянному имени контейнера, поэтому показывают строки и от прежних его версий. `docker compose logs` показывает только текущий контейнер; для истории после выкатки используйте журнал.
+
+Для чтения за определённое время или наблюдения в реальном времени подключитесь к серверу и используйте `journalctl` (эти команды могут запросить ваш пароль sudo):
+
+```sh
+ssh -t crm
+# Приложение prod: последние 200 строк за последний час
+sudo journalctl --no-pager -n 200 --since '1 hour ago' -o short-iso-precise CONTAINER_NAME=prod-app-1
+# Приложение стенда: новые строки в реальном времени, выход — Ctrl+C
+sudo journalctl -f -n 50 -o short-iso-precise CONTAINER_NAME=staging-app-1
+# База prod; для базы стенда — CONTAINER_NAME=staging-db-1
+sudo journalctl --no-pager -n 200 CONTAINER_NAME=prod-db-1
+# Место, которое занимает весь журнал сервера, и его настройки
+sudo journalctl --disk-usage
+systemd-analyze cat-config systemd/journald.conf
+```
+
+Ошибки запросов к базе есть только в журнале приложения, без значений запроса: сама Postgres их в свой журнал не пишет.
+
+Проверка сохранности: выполните `ssh crm sudo crm-deploy status prod` и такую же команду для `staging` — у приложения и базы должно быть `logging=journald`. Затем запустите `ssh crm sudo crm-deploy verify-logs staging`. Стенд будет кратковременно недоступен: команда пересоздаст только его приложение, сравнит последние 200 записей старого контейнера до и после (если их меньше — все), проверит новые строки и `/health`. При успехе выведет разные ID старого и нового контейнеров, SHA256 сохранённых записей и сообщение `Old journal entries preserved exactly`. База стенда и прод при этой проверке не пересоздаются. При сбое команда остановится с ошибкой, автоматического отката нет; ручной откат стенда — `ssh crm sudo crm-deploy rollback staging`.
 
 ### Бэкапы
 
@@ -263,7 +289,7 @@ DB_MEMORY_LIMIT=512m
 
 При первом deploy скрипт сам загружает самую свежую готовую копию `prod-*.sql.gz` или `daily-*.sql.gz` в новую staging базу. Если нужно создать базу до первого deploy, запустите `ssh crm sudo crm-deploy staging-init staging`. Для обновления тестовых данных подтвердите замену staging базы: `ssh -t crm sudo crm-deploy staging-refresh staging`.
 
-После merge в `main` SHA автоматически выкатывается на staging. Выкатку проверенного SHA на прод запускаете вы через **Deploy prod**. Проверить стенд: откройте `https://test-app.vupsen.space`, войдите с Basic Auth, запросите magic link и проверьте, что письмо ведёт на этот же адрес; `/health` на сервере проверяется deploy-скриптом. Статус и логи: `ssh crm sudo crm-deploy status staging` и `ssh crm "sudo journalctl -n 200 CONTAINER_NAME=staging-app-1"`. Ручной откат: `ssh crm sudo crm-deploy rollback staging`.
+После merge в `main` SHA автоматически выкатывается на staging. Выкатку проверенного SHA на прод запускаете вы через **Deploy prod**. Проверить стенд: откройте `https://test-app.vupsen.space`, войдите с Basic Auth, запросите magic link и проверьте, что письмо ведёт на этот же адрес; `/health` на сервере проверяется deploy-скриптом. Статус и логи: `ssh crm sudo crm-deploy status staging` и `ssh crm sudo crm-deploy logs staging`. Ручной откат: `ssh crm sudo crm-deploy rollback staging`.
 
 ## Где что лежит
 
