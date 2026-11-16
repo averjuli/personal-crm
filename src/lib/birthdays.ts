@@ -45,3 +45,18 @@ export function isValidBirthday({
   const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   return day >= 1 && day <= days[month - 1];
 }
+
+// A day and month without a birth year describe an annual birthday,
+// so they cannot be compared to a complete calendar date.
+export function isFutureBirthday(
+  { birthDay: day, birthMonth: month, birthYear: year }: Birthday,
+  today: string,
+) {
+  if (year === null || month === null || day === null) return false;
+  const [currentYear, currentMonth, currentDay] = today.split("-").map(Number);
+  return (
+    year > currentYear ||
+    (year === currentYear &&
+      (month > currentMonth || (month === currentMonth && day > currentDay)))
+  );
+}

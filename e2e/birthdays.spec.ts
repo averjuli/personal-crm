@@ -97,6 +97,42 @@ test("clears the complete birthday", async ({ page }) => {
   await expectBirthday(page, "", "");
 });
 
+test("keeps birthday edits after validation and repeated saves without a reload", async ({
+  page,
+}) => {
+  await create(page, "15", "11");
+  await page.getByLabel("Кто это", { exact: true }).fill("Подруга");
+  await fillBirthday(page, "31", "4");
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect(
+    page.getByText("Укажите существующую дату рождения", { exact: true }),
+  ).toBeVisible();
+  await expectBirthday(page, "31", "4");
+  await expect(page.getByLabel("Кто это", { exact: true })).toHaveValue(
+    "Подруга",
+  );
+
+  await fillBirthday(page, "31", "5");
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect(page.getByText("Изменения сохранены")).toBeVisible();
+  await expectBirthday(page, "31", "5");
+  await expect(
+    page.getByText("Укажите существующую дату рождения", { exact: true }),
+  ).toHaveCount(0);
+
+  await fillBirthday(page, "31", "5", "1990");
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Сохранить", exact: true }),
+  ).toBeEnabled();
+  await expectBirthday(page, "31", "5", "1990");
+  await page.reload();
+  await expectBirthday(page, "31", "5", "1990");
+  await expect(page.getByLabel("Кто это", { exact: true })).toHaveValue(
+    "Подруга",
+  );
+});
+
 async function withDatabase<T>(action: (client: postgres.Sql) => Promise<T>) {
   const client = postgres(e2eDatabaseUrl, { max: 1 });
   try {
@@ -105,6 +141,71 @@ async function withDatabase<T>(action: (client: postgres.Sql) => Promise<T>) {
     await client.end();
   }
 }
+
+test("rejects a mistyped future year when creating a contact", async ({
+  page,
+}) => {
+  await page.goto("/contacts/new");
+  await page.getByLabel("Имя*", { exact: true }).fill("Опечатка в годе");
+  await fillBirthday(page, "22", "11", "20225");
+  await page
+    .getByRole("button", { name: "Добавить контакт", exact: true })
+    .click();
+
+  await expect(
+    page.getByText("Дата рождения не может быть позже сегодняшней", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expectBirthday(page, "22", "11", "20225");
+  await expect(page.getByLabel("Имя*", { exact: true })).toHaveValue(
+    "Опечатка в годе",
+  );
+  const saved = await withDatabase(
+    (client) => client`
+      select id from contacts
+      where owner_id = ${e2eUser.id} and name = 'Опечатка в годе'`,
+  );
+  expect(saved).toHaveLength(0);
+
+  await fillBirthday(page, "22", "11", "2000");
+  await page
+    .getByRole("button", { name: "Добавить контакт", exact: true })
+    .click();
+  await expect(page.getByText("Контакт добавлен")).toBeVisible();
+  await page.reload();
+  await expectBirthday(page, "22", "11", "2000");
+});
+
+test("rejects a future birth date without changing the saved contact", async ({
+  page,
+}) => {
+  await create(page, "15", "11", "2000");
+  const tomorrow = new Date(`${todayInAppTimeZone()}T00:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const day = String(tomorrow.getUTCDate());
+  const month = String(tomorrow.getUTCMonth() + 1);
+  const year = String(tomorrow.getUTCFullYear());
+  await fillBirthday(page, day, month, year);
+  await page.getByLabel("Имя*", { exact: true }).fill("Не сохранять изменения");
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+
+  await expect(
+    page.getByText("Дата рождения не может быть позже сегодняшней", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expectBirthday(page, day, month, year);
+  await expect(page.getByLabel("Имя*", { exact: true })).toHaveValue(
+    "Не сохранять изменения",
+  );
+
+  await page.reload();
+  await expectBirthday(page, "15", "11", "2000");
+  await expect(page.getByLabel("Имя*", { exact: true })).toHaveValue(
+    "Ирина Белова",
+  );
+});
 
 async function addUpcoming(name = "Именинница", overdue = false) {
   const today = todayInAppTimeZone();

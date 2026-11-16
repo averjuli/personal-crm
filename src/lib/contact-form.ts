@@ -1,8 +1,13 @@
 import { z } from "zod";
 
 import { contactFrequencies } from "@/db/schema";
-import { isValidBirthday, parseBirthdayPart } from "@/lib/birthdays";
+import {
+  isFutureBirthday,
+  isValidBirthday,
+  parseBirthdayPart,
+} from "@/lib/birthdays";
 import { parseGroupIds } from "@/lib/group-form";
+import { todayInAppTimeZone } from "@/lib/keep-in-touch";
 
 // Empty or whitespace-only inputs are stored as NULL
 const optionalText = (max: number) =>
@@ -47,6 +52,12 @@ export const contactInputSchema = z
         code: "custom",
         path: ["birthDay"],
         message: "Укажите существующую дату рождения",
+      });
+    } else if (isFutureBirthday(values, todayInAppTimeZone())) {
+      context.addIssue({
+        code: "custom",
+        path: ["birthDay"],
+        message: "Дата рождения не может быть позже сегодняшней",
       });
     }
   });

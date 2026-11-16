@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseContactForm } from "@/lib/contact-form";
 
@@ -21,11 +21,23 @@ function form(day = "", month = "", year = "") {
 }
 
 describe("birthday form validation", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T09:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it.each([
     ["empty birthday", "", "", "", null, null, null],
     ["unknown birth year", "15", "11", "", 15, 11, null],
     ["complete leap day", "29", "2", "2000", 29, 2, 2000],
     ["leap day without a year", "29", "2", "", 29, 2, null],
+    ["today", "16", "11", "2026", 16, 11, 2026],
+    ["yesterday", "15", "11", "2026", 15, 11, 2026],
+    ["a later month without a year", "22", "12", "", 22, 12, null],
   ] as const)(
     "accepts %s",
     (_name, day, month, year, birthDay, birthMonth, birthYear) => {
@@ -51,6 +63,10 @@ describe("birthday form validation", () => {
     ["out of range month", "15", "13", ""],
     ["zero day", "0", "11", ""],
     ["negative year", "15", "11", "-1"],
+    ["zero year", "15", "11", "0"],
+    ["non-numeric year", "15", "11", "hello"],
+    ["partially numeric year", "15", "11", "2025abc"],
+    ["fractional year", "15", "11", "2025.5"],
   ])("rejects %s without losing entered values", (_name, day, month, year) => {
     const result = parseContactForm(form(day, month, year));
     expect(result.success).toBe(false);
@@ -65,5 +81,35 @@ describe("birthday form validation", () => {
         birthYear: year,
       });
     }
+  });
+
+  it.each([
+    ["a mistyped five-digit year", "22", "11", "20225"],
+    ["next year", "15", "11", "2027"],
+    ["a later month this year", "1", "12", "2026"],
+    ["tomorrow", "17", "11", "2026"],
+  ])("rejects %s without losing entered values", (_name, day, month, year) => {
+    const result = parseContactForm(form(day, month, year));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.state.errors?.birthDay).toContain(
+        "Дата рождения не может быть позже сегодняшней",
+      );
+      expect(result.state.values).toMatchObject({
+        name: "Anna",
+        birthDay: day,
+        birthMonth: month,
+        birthYear: year,
+      });
+    }
+  });
+
+  it("uses Moscow's current day and recalculates it after midnight", () => {
+    vi.setSystemTime(new Date("2026-11-16T20:59:59Z"));
+    expect(parseContactForm(form("17", "11", "2026")).success).toBe(false);
+
+    vi.setSystemTime(new Date("2026-11-16T21:00:00Z"));
+    expect(parseContactForm(form("17", "11", "2026")).success).toBe(true);
+    expect(parseContactForm(form("18", "11", "2026")).success).toBe(false);
   });
 });
